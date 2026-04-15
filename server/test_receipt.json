@@ -1,0 +1,13 @@
+{
+  "customer_name": "Test User",
+  "customer_email": "test@example.com",
+  "items": [
+    {
+      "description": "Item 1",
+      "quantity": 1,
+      "price": 10.00,
+      "total": 10.00
+    }
+  ],
+  "total_amount": 10.00
+}

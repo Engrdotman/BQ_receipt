@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt History | BQ Receipt System</title>
+    <meta name="description" content="View and manage your previous receipts and invoices.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS -->
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="glass animate-fade">
+            <nav class="nav">
+                <div class="logo-container">
+                    <img src="../assets/logo.png" alt="BQ Receipt Logo">
+                    <span style="font-size: 1.5rem; font-weight: 700;">BQ Receipt</span>
+                </div>
+                <div class="nav-links">
+                    <a href="create-receipt.html">Create</a>
+                    <a href="view-receipt.html" class="active">History</a>
+                    <a href="#" id="logoutBtn" style="color: var(--error);">Logout</a>
+                </div>
+            </nav>
+        </header>
+
+        <main class="animate-fade" style="animation-delay: 0.2s;">
+            <div class="form-card glass">
+                <div class="flex-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <h1>Receipt History</h1>
+                        <p style="color: var(--text-secondary);">Manage and track all generated receipts.</p>
+                    </div>
+                    <div class="search-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <input type="text" id="searchInput" placeholder="Search by name..." style="width: 250px; padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                        <button id="searchBtn" class="btn btn-primary" style="background: var(--primary-color); color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Search</button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Email</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receiptsTableBody">
+                            <!-- Data will be populated by JS -->
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 4rem; color: var(--text-secondary);">
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                                        <div style="font-size: 2rem; opacity: 0.3;">📄</div>
+                                        Fetching receipt records...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import api from '../js/api.js';
+
+        let allReceipts = [];
+
+        async function loadReceipts() {
+            try {
+                allReceipts = await api.receipts.getAll();
+                renderReceipts(allReceipts);
+            } catch (error) {
+                const tableBody = document.getElementById('receiptsTableBody');
+                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 4rem; color: var(--error);">Failed to load receipts. Please ensure the server is running.</td></tr>`;
+            }
+        }
+
+        function renderReceipts(receipts) {
+            const tableBody = document.getElementById('receiptsTableBody');
+            
+            if (receipts.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 4rem;">No receipts found.</td></tr>`;
+                return;
+            }
+            
+            tableBody.innerHTML = receipts.map(r => `
+                <tr>
+                    <td>${new Date(r.created_at).toLocaleDateString()}</td>
+                    <td style="font-weight: 500;">${r.customer_name}</td>
+                    <td style="color: var(--text-secondary);">${r.customer_email || 'N/A'}</td>
+                    <td style="color: var(--accent-color); font-weight: 600;">#${parseFloat(r.total_amount).toFixed(2)}</td>
+                    <td><span style="padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.1); color: var(--success);">Paid</span></td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn-download" data-id="${r.id}">Download</button>
+                            <button class="btn-delete" data-id="${r.id}">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Add event listeners
+            document.querySelectorAll('.btn-download').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    api.receipts.download(e.target.dataset.id);
+                });
+            });
+
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    if (confirm('Are you sure you want to delete this receipt?')) {
+                        try {
+                            await api.receipts.delete(e.target.dataset.id);
+                            loadReceipts();
+                        } catch (err) {
+                            alert('Failed to delete receipt: ' + err.message);
+                        }
+                    }
+                });
+            });
+        }
+
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+
+        function handleSearch() {
+            const query = searchInput.value.toLowerCase();
+            const filtered = allReceipts.filter(r => 
+                r.customer_name.toLowerCase().includes(query) || 
+                r.customer_email.toLowerCase().includes(query)
+            );
+            renderReceipts(filtered);
+        }
+
+        searchBtn.addEventListener('click', handleSearch);
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') handleSearch();
+        });
+
+        // Auth Check
+        if (!localStorage.getItem('bq_token')) {
+            window.location.href = 'admin-login.html';
+        }
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('bq_token');
+                localStorage.removeItem('bq_user');
+                window.location.href = 'admin-login.html';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadReceipts);
+    </script>
+</body>
+</html>

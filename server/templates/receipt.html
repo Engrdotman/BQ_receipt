@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --primary:orange;
+            --dark: #1e293b;
+            --gray: #64748b;
+            --light: #f8fafc;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: var(--dark);
+            margin: 0;
+            padding: 0;
+            background: white;
+            line-height: 1.5;
+        }
+        .receipt-container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 30px;
+            margin-bottom: 30px;
+        }
+        .logo-section h1 {
+            color: var(--primary);
+            margin: 0;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .logo-section p {
+            color: var(--gray);
+            margin: 5px 0 0 0;
+            font-size: 14px;
+        }
+        .info-section {
+            text-align: right;
+        }
+        .info-section h2 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--dark);
+        }
+        .info-section p {
+            margin: 4px 0;
+            color: var(--gray);
+            font-size: 13px;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        .details-col h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--gray);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+        .details-col p {
+            margin: 4px 0;
+            font-size: 14px;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .items-table th {
+            text-align: left;
+            background: var(--light);
+            padding: 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--gray);
+            border-bottom: 1px solid var(--border);
+        }
+        .items-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .total-section {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .total-box {
+            width: 250px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        .total-row.grand-total {
+            border-top: 2px solid var(--primary);
+            margin-top: 10px;
+            padding-top: 15px;
+            font-weight: 800;
+            font-size: 18px;
+            color: var(--primary);
+        }
+        .footer {
+            margin-top: 60px;
+            text-align: center;
+            color: var(--gray);
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <div class="header">
+            <div class="logo-section">
+                <h1>BQ RECEIPT</h1>
+                <p>Digital Receipt System</p>
+            </div>
+            <div class="info-section">
+                <h2>INVOICE</h2>
+                <p>#{{receipt_id}}</p>
+                <p>Date: {{date}}</p>
+            </div>
+        </div>
+
+        <div class="details-grid">
+            <div class="details-col">
+                <h3>Billed To</h3>
+                <p><strong>{{customer_name}}</strong></p>
+                <p>{{customer_email}}</p>
+                <p>{{customer_phone}}</p>
+            </div>
+            <div class="details-col">
+                <h3>Payment Info</h3>
+                <p>Status: <span style="color: #10b981; font-weight: 600;">PAID</span></p>
+                <p>Method: transfer</p>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: center;">Quantity</th>
+                    <th style="text-align: right;">Price</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each items}}
+                <tr>
+                    <td>{{description}}</td>
+                    <td style="text-align: center;">{{quantity}}</td>
+                    <td style="text-align: right;">#{{price}}</td>
+                    <td style="text-align: right;">#{{total}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <div class="total-box">
+                <div class="total-row">
+                    <span>Subtotal</span>
+                    <span>#{{subtotal}}</span>
+                </div>
+                <div class="total-row">
+                    <span>Tax (0%)</span>
+                    <span>#0.00</span>
+                </div>
+                <div class="total-row grand-total">
+                    <span>Amount Due</span>
+                    <span>#{{total_amount}}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Thank you for your business!</p>
+            <p>If you have any questions about this receipt, please contact support@bqreceipt.com</p>
+        </div>
+    </div>
+</body>
+</html>

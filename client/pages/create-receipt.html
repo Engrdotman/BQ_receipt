@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Receipt | BQ Receipt System</title>
+    <meta name="description" content="Generate professional digital receipts instantly with BQ Receipt System.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS -->
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .item-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .flex-1 { flex: 1; }
+        .w-32 { width: 120px; }
+        .btn-remove {
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: var(--transition);
+        }
+        .btn-remove:hover { transform: scale(1.1); }
+        .form-section { margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="glass animate-fade">
+            <nav class="nav">
+                <div class="logo-container">
+                    <img src="../assets/logo.png" alt="BQ Receipt Logo">
+                    <span style="font-size: 1.5rem; font-weight: 700;">BQ Receipt</span>
+                </div>
+                <div class="nav-links">
+                    <a href="create-receipt.html" class="active">Create</a>
+                    <a href="view-receipt.html">History</a>
+                    <a href="#" id="logoutBtn" style="color: var(--error);">Logout</a>
+                </div>
+            </nav>
+        </header>
+
+        <main class="animate-fade" style="animation-delay: 0.2s;">
+            <div class="form-card glass">
+                <h1>Generate New Receipt</h1>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Fill in the details below to create a professional invoice.</p>
+                
+                <form id="receiptForm">
+                    <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <div class="form-group">
+                            <label for="customerName">Customer Name</label>
+                            <input type="text" id="customerName" placeholder="e.g. John Doe" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="customerEmail">Customer Email</label>
+                            <input type="email" id="customerEmail" placeholder="john@example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="receiptDate">Date</label>
+                        <input type="date" id="receiptDate" required>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="flex-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.2rem; font-weight: 600;">Line Items</h2>
+                            <button type="button" id="addItemBtn" class="btn" style="background: rgba(255,255,255,0.1); color: var(--accent-color);">+ Add Item</button>
+                        </div>
+                        
+                        <div id="itemsContainer">
+                            <div class="item-row">
+                                <div class="form-group flex-1">
+                                    <input type="text" placeholder="Item Name" class="item-name" required>
+                                </div>
+                                <div class="form-group w-32">
+                                    <input type="number" placeholder="Qty" class="item-qty" min="1" required>
+                                </div>
+                                <div class="form-group w-32">
+                                    <input type="number" placeholder="Price" class="item-price" step="0.01" required>
+                                </div>
+                                <div style="width: 30px;"></div> <!-- Spacer for remove button alignment -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="margin-top: 3rem; text-align: right;">
+                        <button type="submit" class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem;">Generate Receipt</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="../js/createReceipt.js"></script>
+    <script type="module">
+        // Auth Check
+        if (!localStorage.getItem('bq_token')) {
+            window.location.href = 'admin-login.html';
+        }
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('bq_token');
+                localStorage.removeItem('bq_user');
+                window.location.href = 'admin-login.html';
+            });
+        }
+    </script>
+</body>
+</html>

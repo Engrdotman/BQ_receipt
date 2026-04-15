@@ -1,0 +1,14 @@
+#node_modules
+node_modules
+#environment variables
+.env
+#local environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+#os files
+.DS_Store
+Thumbs.db
+#diagnostic files
+server/test-db.js
