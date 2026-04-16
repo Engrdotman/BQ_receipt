@@ -25,9 +25,12 @@ app.get("/test-db", async (req, res) => {
     await pool.query(`
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_email TEXT;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_name TEXT;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_address TEXT;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS imei_number TEXT;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS items JSONB;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS total_amount DECIMAL;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS receipt_id VARCHAR(50) UNIQUE;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
     `);
 
     // Create users table
@@ -43,10 +46,14 @@ app.get("/test-db", async (req, res) => {
     // Check if admin exists, if not create one
     const adminCheck = await pool.query("SELECT * FROM users WHERE username = 'admin'");
     if (adminCheck.rows.length === 0) {
-      const hashedPassword = await bcrypt.hash("admin2026", 10);
+      const hashedPassword = await bcrypt.hash("$2a$10$kjsdfhksjdfhksjdfh...", 10);
       await pool.query("INSERT INTO users (username, password, role) VALUES ($1, $2, $3)", ["admin", hashedPassword, "admin"]);
+      console.log("✅ Default admin user created (admin / admin2026)");
+    } else {
+      console.log("ℹ️ Admin user 'admin' already exists in database");
     }
 
+    // ✅ Test DB route
     const result = await pool.query("SELECT * FROM receipts LIMIT 1");
     res.json({ message: "Schema checked/updated & Admin user verified", sample: result.rows[0] });
   } catch (err) {
@@ -54,6 +61,7 @@ app.get("/test-db", async (req, res) => {
     res.status(500).json({ error: "Database operation failed: " + err.message });
   }
 });
+
 
 app.get("/", (req, res) => {
   res.send("BQ Receipt Server running 🚀");
@@ -78,6 +86,8 @@ const initDB = async () => {
         await pool.query(`
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_email TEXT;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_name TEXT;
+            ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_address TEXT;
+            ALTER TABLE receipts ADD COLUMN IF NOT EXISTS imei_number TEXT;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS items JSONB;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS total_amount DECIMAL;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS receipt_id VARCHAR(50) UNIQUE;
@@ -108,3 +118,4 @@ app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   await initDB();
 });
+

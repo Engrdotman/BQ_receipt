@@ -14,13 +14,13 @@ class Receipt {
     }
 
     static async create(data) {
-        const { receipt_id, customer_name, customer_email, items, total_amount } = data;
+        const { receipt_id, customer_name, customer_email, customer_address, imei_number, items, total_amount } = data;
         const query = `
-            INSERT INTO receipts (receipt_id, customer_name, customer_email, items, total_amount)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO receipts (receipt_id, customer_name, customer_email, customer_address, imei_number, items, total_amount)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
         `;
-        const values = [receipt_id, customer_name, customer_email, JSON.stringify(items), total_amount];
+        const values = [receipt_id, customer_name, customer_email, customer_address, imei_number, JSON.stringify(items), total_amount];
         const { rows } = await pool.query(query, values);
         return rows[0];
     }

@@ -9,6 +9,21 @@ const __dirname = path.dirname(__filename);
 
 class PDFService {
     /**
+     * Get logo as base64 string
+     * @returns {Promise<string>} - Base64 data URI of the logo
+     */
+    async getLogoBase64() {
+        try {
+            const logoPath = path.join(__dirname, '../templates/logo.jpg');
+            const logoBuffer = await fs.readFile(logoPath);
+            return `data:image/jpeg;base64,${logoBuffer.toString('base64')}`;
+        } catch (error) {
+            console.error('Failed to read logo.jpg:', error);
+            return '';
+        }
+    }
+
+    /**
      * Generate a PDF from a template and data
      * @param {string} templateName - Name of the template in templates folder
      * @param {object} data - Data to inject into template

@@ -2,9 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary:orange;
+            --primary:#ffa500;
             --dark: #1e293b;
             --gray: #64748b;
             --light: #f8fafc;
@@ -128,8 +131,7 @@
     <div class="receipt-container">
         <div class="header">
             <div class="logo-section">
-                <h1>BQ RECEIPT</h1>
-                <p>Digital Receipt System</p>
+                <img src="{{logo_base64}}" alt="BQ Receipt Logo" style="max-height: 80px;">
             </div>
             <div class="info-section">
                 <h2>INVOICE</h2>
@@ -144,11 +146,12 @@
                 <p><strong>{{customer_name}}</strong></p>
                 <p>{{customer_email}}</p>
                 <p>{{customer_phone}}</p>
+                <p>{{customer_address}}</p>
             </div>
             <div class="details-col">
                 <h3>Payment Info</h3>
                 <p>Status: <span style="color: #10b981; font-weight: 600;">PAID</span></p>
-                <p>Method: transfer</p>
+                <p>Method: {{payment_method}}</p>
             </div>
         </div>
 
@@ -186,6 +189,20 @@
                 <div class="total-row grand-total">
                     <span>Amount Due</span>
                     <span>#{{total_amount}}</span>
+                </div>
+            </div>
+        </div>
+        <div class="signatures-section" style="display: flex; justify-content: space-between; margin-top: 60px;">
+            <div class="signature-box" style="text-align: center; width: 250px;">
+                <p style="color: var(--gray); font-size: 12px; text-transform: uppercase;">Customer Signature</p>
+                <div style="height: 60px; border-bottom: 1px solid var(--dark); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;">
+                    <span style="font-family: 'Cedarville Cursive', cursive; font-size: 24px;">{{customer_name}}</span>
+                </div>
+            </div>
+            <div class="signature-box" style="text-align: center; width: 250px;">
+                <p style="color: var(--gray); font-size: 12px; text-transform: uppercase;">BQ Signature</p>
+                <div style="height: 60px; border-bottom: 1px solid var(--dark); display: flex; align-items: flex-end; justify-content: center;">
+                    <img src="{{logo_base64}}" alt="BQ Signature" style="max-height: 50px;">
                 </div>
             </div>
         </div>

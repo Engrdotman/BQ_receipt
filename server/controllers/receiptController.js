@@ -14,10 +14,10 @@ class ReceiptController {
 
     static async create(req, res) {
         try {
-            const { customer_name, customer_email, items, total_amount } = req.body;
+            const { customer_name, customer_email, customer_phone, customer_address, payment_method, imei_number, items, total_amount } = req.body;
             
             // Basic validation for security/integrity
-            if (!customer_name || !customer_email || !items || !total_amount) {
+            if (!customer_name || !customer_email || !items || !total_amount || !customer_phone || !customer_address || !payment_method || !imei_number) {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
@@ -26,6 +26,10 @@ class ReceiptController {
                 receipt_id,
                 customer_name,
                 customer_email,
+                customer_phone,
+                customer_address,
+                payment_method,
+                imei_number,
                 items,
                 total_amount
             });
@@ -52,9 +56,14 @@ class ReceiptController {
                 date: new Date(receipt.created_at).toLocaleDateString(),
                 customer_name: receipt.customer_name,
                 customer_email: receipt.customer_email,
+                customer_phone: receipt.customer_phone,
+                customer_address: receipt.customer_address,
+                payment_method: receipt.payment_method,
+                imei_number: receipt.imei_number,
                 items: receipt.items,
                 subtotal: receipt.total_amount,
-                total_amount: receipt.total_amount
+                total_amount: receipt.total_amount,
+                logo_base64: await pdfService.getLogoBase64()
             };
 
             const pdfBuffer = await pdfService.generateReceiptPDF(templateData);
