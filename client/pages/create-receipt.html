@@ -43,12 +43,14 @@
         <header class="glass animate-fade">
             <nav class="nav">
                 <div class="logo-container">
-                    <img src="../assets/logo.png" alt="BQ Receipt Logo">
+                    <img src="../assets/logo.jpg" alt="BQ Receipt Logo">
                     <span style="font-size: 1.5rem; font-weight: 700;">BQ Receipt</span>
                 </div>
                 <div class="nav-links">
-                    <a href="create-receipt.html" class="active">Create</a>
-                    <a href="view-receipt.html">History</a>
+                    <a href="dashboard.html" class="active">Dashboard</a>
+                </div>
+                <div class="nav-actions">
+                    <span id="userName" style="margin-right: 1rem; color: var(--text-secondary);"></span>
                     <a href="#" id="logoutBtn" style="color: var(--error);">Logout</a>
                 </div>
             </nav>
@@ -69,11 +71,27 @@
                             <label for="customerEmail">Customer Email</label>
                             <input type="email" id="customerEmail" placeholder="john@example.com" required>
                         </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="receiptDate">Date</label>
-                        <input type="date" id="receiptDate" required>
+                        <div class="form-group">
+                            <label for="customerPhone">Customer Phone</label>
+                            <input type="tel" id="customerPhone" placeholder="e.g. +1234567890" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="customerAddress">Customer Address</label>
+                            <input type="text" id="customerAddress" placeholder="e.g. 123 Main St" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="paymentMethod">Payment Method</label>
+                            <select id="paymentMethod" required>
+                                <option value="">Select method</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="imeiNumber">IMEI Number</label>
+                            <input type="text" id="imeiNumber" placeholder="e.g. 123456789012345">
+                        </div>
                     </div>
 
                     <div class="form-section">
@@ -106,23 +124,89 @@
         </main>
     </div>
 
-    <!-- Scripts -->
-    <script type="module" src="../js/createReceipt.js"></script>
     <script type="module">
-        // Auth Check
-        if (!localStorage.getItem('bq_token')) {
-            window.location.href = 'admin-login.html';
-        }
-
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                localStorage.removeItem('bq_token');
-                localStorage.removeItem('bq_user');
-                window.location.href = 'admin-login.html';
+        import { checkAuth, handleLogout, getUser } from '../js/auth.js';
+        
+        const receiptForm = document.getElementById('receiptForm');
+        const itemsContainer = document.getElementById('itemsContainer');
+        if (!checkAuth()) throw new Error('Not authenticated');
+        
+        // Add item button
+        document.getElementById('addItemBtn').addEventListener('click', () => {
+            const itemRow = document.createElement('div');
+            itemRow.classList.add('item-row');
+            itemRow.innerHTML = `
+                <div class="form-group flex-1">
+                    <input type="text" placeholder="Item Name" class="item-name" required>
+                </div>
+                <div class="form-group w-32">
+                    <input type="number" placeholder="Qty" class="item-qty" min="1" required>
+                </div>
+                <div class="form-group w-32">
+                    <input type="number" placeholder="Price" class="item-price" step="0.01" required>
+                </div>
+                <button type="button" class="btn-remove" onclick="this.parentElement.remove()">×</button>
+            `;
+            itemsContainer.appendChild(itemRow);
+        });
+        
+        // Form submission
+        receiptForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const items = [];
+            document.querySelectorAll('.item-row').forEach(row => {
+                items.push({
+                    description: row.querySelector('.item-name').value,
+                    quantity: parseInt(row.querySelector('.item-qty').value),
+                    price: parseFloat(row.querySelector('.item-price').value),
+                    total: (parseInt(row.querySelector('.item-qty').value) * parseFloat(row.querySelector('.item-price').value)).toFixed(2)
+                });
             });
-        }
+            
+            const total = items.reduce((sum, item) => sum + parseFloat(item.total), 0);
+            
+            const receiptData = {
+                customer_name: document.getElementById('customerName').value,
+                customer_email: document.getElementById('customerEmail').value,
+                customer_phone: document.getElementById('customerPhone').value,
+                customer_address: document.getElementById('customerAddress').value,
+                payment_method: document.getElementById('paymentMethod').value,
+                imei_number: document.getElementById('imeiNumber').value,
+                items: items,
+                total_amount: total.toFixed(2)
+            };
+            
+            try {
+                const token = localStorage.getItem('bq_token');
+                const response = await fetch('http://localhost:5000/api/receipts', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(receiptData)
+                });
+                
+                if (!response.ok) throw new Error('Failed to create receipt');
+                
+                const data = await response.json();
+                alert('Receipt created successfully! ID: ' + data.receipt_id);
+                receiptForm.reset();
+            } catch (error) {
+                console.error('Error creating receipt:', error);
+                alert('Failed to create receipt. Please try again.');
+            }
+        });
+        
+        const user = getUser();
+        const userEl = document.getElementById('userName');
+        if (userEl && user) userEl.textContent = user.username;
+        
+        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleLogout();
+        });
     </script>
 </body>
 </html>

@@ -2,21 +2,50 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import pool from "./config/db.js";
+import { getMasterPool, initializeMasterDatabase } from "./config/masterDb.js";
 import receiptRoutes from "./routes/receiptRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import masterRoutes from "./routes/masterRoutes.js";
 import bcrypt from "bcryptjs";
 
 dotenv.config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// ✅ API Routes
 app.use("/api/receipts", receiptRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/master", masterRoutes);
+
+app.get("/seed", async (req, res) => {
+  try {
+    const masterPool = getMasterPool();
+    
+    const hashedPassword = await bcrypt.hash('master2026', 10);
+    await masterPool.query(
+      'INSERT INTO master_users (username, password, role) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING',
+      ['master', hashedPassword, 'super_admin']
+    );
+    
+    const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:hertheydotun@localhost:7085/BQ_receiptdb';
+    await masterPool.query(
+      'INSERT INTO tenants (tenant_id, name, slug, database_url, status) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (slug) DO NOTHING',
+      ['tenant_bq', 'BQ Receipt', 'bq_receipt', dbUrl, 'active']
+    );
+    
+    const clientPassword = await bcrypt.hash('admin2026', 10);
+    await masterPool.query(
+      'INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, username) DO NOTHING',
+      ['tenant_bq', 'admin', clientPassword, 'admin']
+    );
+    
+    res.send("✅ Seed done! Master: master/master2026 | Client: admin/admin2026 | Tenant: bq_receipt");
+  } catch (error) {
+    res.send("Seed error: " + error.message);
+  }
+});
 
 // ✅ Test DB route
 app.get("/test-db", async (req, res) => {
@@ -26,6 +55,8 @@ app.get("/test-db", async (req, res) => {
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_email TEXT;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_name TEXT;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_address TEXT;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_phone TEXT;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS payment_method TEXT;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS imei_number TEXT;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS items JSONB;
       ALTER TABLE receipts ADD COLUMN IF NOT EXISTS total_amount DECIMAL;
@@ -67,6 +98,29 @@ app.get("/", (req, res) => {
   res.send("BQ Receipt Server running 🚀");
 });
 
+app.get("/check-admin", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, username, role, LEFT(password, 20) as pwd_hash FROM users");
+    res.json({ users: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/reset-admin", async (req, res) => {
+  try {
+    const hashedPassword = await bcrypt.hash("admin2026", 10);
+    await pool.query(`
+      INSERT INTO users (username, password, role) 
+      VALUES ('admin', $1, 'admin')
+      ON CONFLICT (username) DO UPDATE SET password = $1
+    `, [hashedPassword]);
+    res.json({ message: "Admin reset - use admin / admin2026" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ✅ 404 Handler for undefined routes
 app.use((req, res) => {
     res.status(404).json({ error: `Path ${req.originalUrl} not found` });
@@ -87,6 +141,8 @@ const initDB = async () => {
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_email TEXT;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_name TEXT;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_address TEXT;
+            ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_phone TEXT;
+            ALTER TABLE receipts ADD COLUMN IF NOT EXISTS payment_method TEXT;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS imei_number TEXT;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS items JSONB;
             ALTER TABLE receipts ADD COLUMN IF NOT EXISTS total_amount DECIMAL;
@@ -117,5 +173,15 @@ const initDB = async () => {
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   await initDB();
+  await initMasterDB();
 });
+
+const initMasterDB = async () => {
+    try {
+        await initializeMasterDatabase();
+        console.log("✅ Master database initialized");
+    } catch (err) {
+        console.log("⚠️ Master DB not available:", err.message);
+    }
+};
 

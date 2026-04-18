@@ -14,6 +14,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <header class="glass animate-fade">
             <nav class="nav">
                 <div class="logo-container">
@@ -21,8 +22,10 @@
                     <span style="font-size: 1.5rem; font-weight: 700;">BQ Receipt</span>
                 </div>
                 <div class="nav-links">
-                    <a href="create-receipt.html">Create</a>
-                    <a href="view-receipt.html" class="active">History</a>
+                    <a href="dashboard.html">Dashboard</a>
+                </div>
+                <div class="nav-actions">
+                    <span id="userName" style="margin-right: 1rem; color: var(--text-secondary);"></span>
                     <a href="#" id="logoutBtn" style="color: var(--error);">Logout</a>
                 </div>
             </nav>
@@ -60,7 +63,7 @@
                         <tbody id="receiptsTableBody">
                             <!-- Data will be populated by JS -->
                             <tr>
-                                <td colspan="6" style="text-align: center; padding: 4rem; color: var(--text-secondary);">
+                                <td colspan="10" style="text-align: center; padding: 4rem; color: var(--text-secondary);">
                                     <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
                                         <div style="font-size: 2rem; opacity: 0.3;">📄</div>
                                         Fetching receipt records...
@@ -76,17 +79,29 @@
 
     <!-- Scripts -->
     <script type="module">
-        import api from '../js/api.js';
+        import { receipts, logout } from '../js/api.js';
+        import { checkAuth, getUser, handleLogout } from '../js/auth.js';
+
+        if (!checkAuth()) throw new Error('Not authenticated');
+
+        const user = getUser();
+        const userEl = document.getElementById('userName');
+        if (userEl && user) userEl.textContent = user.username;
+
+        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleLogout();
+        });
 
         let allReceipts = [];
 
         async function loadReceipts() {
             try {
-                allReceipts = await api.receipts.getAll();
+                allReceipts = await receipts.getAll();
                 renderReceipts(allReceipts);
             } catch (error) {
                 const tableBody = document.getElementById('receiptsTableBody');
-                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 4rem; color: var(--error);">Failed to load receipts. Please ensure the server is running.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 4rem; color: var(--error);">Failed to load receipts. Please ensure the server is running.</td></tr>`;
             }
         }
 
@@ -94,7 +109,7 @@
             const tableBody = document.getElementById('receiptsTableBody');
             
             if (receipts.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 4rem;">No receipts found.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 4rem;">No receipts found.</td></tr>`;
                 return;
             }
             
@@ -111,13 +126,21 @@
                             <button class="btn-delete" data-id="${r.id}">Delete</button>
                         </div>
                     </td>
+                    <td>${r.customer_phone || 'N/A'}</td>
+                    <td>${r.customer_address || 'N/A'}</td>
+                    <td>${r.payment_method || 'N/A'}</td>
+                    <td>${r.imei_number || 'N/A'}</td>
                 </tr>
             `).join('');
 
             // Add event listeners
             document.querySelectorAll('.btn-download').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    api.receipts.download(e.target.dataset.id);
+                btn.addEventListener('click', async (e) => {
+                    try {
+                        await receipts.download(e.target.dataset.id);
+                    } catch (err) {
+                        alert('Download failed: ' + err.message);
+                    }
                 });
             });
 
@@ -125,7 +148,7 @@
                 btn.addEventListener('click', async (e) => {
                     if (confirm('Are you sure you want to delete this receipt?')) {
                         try {
-                            await api.receipts.delete(e.target.dataset.id);
+                            await receipts.delete(e.target.dataset.id);
                             loadReceipts();
                         } catch (err) {
                             alert('Failed to delete receipt: ' + err.message);

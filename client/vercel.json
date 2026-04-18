@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/(.*)",
-            "destination": "/pages/admin-login.html"
+            "destination": "/pages/master-login.html"
         }
     ]
 }

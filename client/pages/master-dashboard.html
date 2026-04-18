@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Dashboard | BQ System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --bg: #0a0a0a;
+            --bg-secondary: #111;
+            --border: #222;
+            --text: #fff;
+            --text-secondary: #888;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logo {
+            background: linear-gradient(90deg, var(--primary), #8b5cf6);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .user-info {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        .logout-btn {
+            color: var(--error);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .container {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .btn {
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-danger {
+            background: transparent;
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        .tenant-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .tenant-table th {
+            text-align: left;
+            padding: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .tenant-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        .status-badge {
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+        .status-active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <span class="logo">MULTI-TENANT</span>
+            <span class="header-title">Receipt System</span>
+        </div>
+        <div class="header-right">
+            <span class="user-info" id="userName">master</span>
+            <a href="#" id="masterLogoutBtn" class="logout-btn">Logout</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Tenants</div>
+                <div class="stat-value" id="tenantCount">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active</div>
+                <div class="stat-value" id="activeCount">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">System Status</div>
+                <div class="stat-value" style="color: var(--success); font-size: 1.5rem;">Online</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Tenants</h2>
+                <button class="btn btn-primary" onclick="showAddTenant()">+ Add Tenant</button>
+            </div>
+            <table class="tenant-table">
+                <thead>
+                    <tr>
+                        <th>NAME</th>
+                        <th>SLUG</th>
+                        <th>STATUS</th>
+                        <th>CREATED</th>
+                        <th>ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody id="tenantsTable">
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                            Loading tenants...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="addTenantModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center;">
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 450px;">
+            <h3 style="margin-bottom: 1.5rem;">Add New Tenant</h3>
+            <form id="addTenantForm">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Tenant Name</label>
+                    <input type="text" id="tenantName" required style="width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: #fff;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Slug</label>
+                    <input type="text" id="tenantSlug" required style="width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: #fff;">
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Database URL</label>
+                    <input type="text" id="tenantDbUrl" required style="width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: #fff;">
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Add Tenant</button>
+                    <button type="button" onclick="hideAddTenant()" class="btn" style="background: transparent; border: 1px solid var(--border); color: var(--text-secondary);">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        const API_URL = 'http://localhost:5000/api';
+        
+        function getToken() {
+            return localStorage.getItem('bq_token');
+        }
+        
+        if (!getToken()) {
+            window.location.href = 'master-login.html';
+        }
+        
+        const user = JSON.parse(localStorage.getItem('bq_user') || '{}');
+        document.getElementById('userName').textContent = user.username || 'master';
+        
+        async function loadTenants() {
+            try {
+                const response = await fetch(`${API_URL}/master/tenants`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const tenants = await response.json();
+                
+                const tbody = document.getElementById('tenantsTable');
+                if (!tenants.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tenants found</td></tr>';
+                    return;
+                }
+                
+                document.getElementById('tenantCount').textContent = tenants.length;
+                document.getElementById('activeCount').textContent = tenants.filter(t => t.status === 'active').length;
+                
+                tbody.innerHTML = tenants.map(t => `
+                    <tr>
+                        <td style="font-weight: 500;">${t.name}</td>
+                        <td style="color: var(--text-secondary);">${t.slug}</td>
+                        <td><span class="status-badge status-active">${t.status}</span></td>
+                        <td style="color: var(--text-secondary);">${new Date(t.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" onclick="manageTenant('${t.tenant_id}', '${t.name}')">Manage</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load tenants:', error);
+            }
+        }
+        
+        // ── Expose functions globally (module scope fix) ──────────────────
+        window.showAddTenant = () => {
+            document.getElementById('addTenantModal').style.display = 'flex';
+            document.getElementById('addTenantForm').reset();
+        };
+
+        window.hideAddTenant = () => {
+            document.getElementById('addTenantModal').style.display = 'none';
+        };
+
+        window.manageTenant = (tenantId, tenantName) => {
+            // Extend this to navigate to a tenant-specific manage page
+            alert(`Managing tenant: ${tenantName}\nID: ${tenantId}\n\n(Tenant manage page coming soon)`);
+        };
+
+        // ── Logout: clear storage then redirect ───────────────────────────
+        document.getElementById('masterLogoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('bq_token');
+            localStorage.removeItem('bq_user');
+            localStorage.removeItem('bq_login_type');
+            window.location.href = 'master-login.html';
+        });
+
+        // ── Add Tenant form submit ─────────────────────────────────────────
+        document.getElementById('addTenantForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = e.target.querySelector('[type="submit"]');
+            submitBtn.textContent = 'Adding...';
+            submitBtn.disabled = true;
+
+            const data = {
+                name: document.getElementById('tenantName').value.trim(),
+                slug: document.getElementById('tenantSlug').value.trim(),
+                database_url: document.getElementById('tenantDbUrl').value.trim()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/master/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to add tenant');
+                }
+
+                window.hideAddTenant();
+                loadTenants();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                submitBtn.textContent = 'Add Tenant';
+                submitBtn.disabled = false;
+            }
+        });
+
+        loadTenants();
+    </script>
+</body>
+</html>

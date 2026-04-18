@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Admin | Receipt Multi-Tenant System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .master-container {
+            width: 100%;
+            max-width: 380px;
+            padding: 2rem;
+        }
+        .master-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 16px;
+            padding: 2.5rem;
+        }
+        .master-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .master-badge {
+            display: inline-block;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+        }
+        .master-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .master-header p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        .form-group label {
+            display: block;
+            color: #888;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95rem;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        .btn-master {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+        .btn-master:hover {
+            opacity: 0.9;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 1.5rem;
+            color: #666;
+            font-size: 0.85rem;
+        }
+        .back-link a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            text-align: center;
+            display: none;
+            margin-top: 1rem;
+        }
+        .error-message.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="master-container">
+        <div class="master-card">
+            <div class="master-header">
+                <span class="master-badge">Super Admin</span>
+                <h1>Receipt Multi-Tenant System</h1>
+                <p>Manage all tenants and system settings</p>
+            </div>
+            
+            <form id="masterLoginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" placeholder="master" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-master">Access Control Panel</button>
+            </form>
+            <div id="loginError" class="error-message"></div>
+            
+            <div class="back-link">
+                <a href="login.html">← Back to client login</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const API_URL = 'http://localhost:5000/api';
+        
+        document.getElementById('masterLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/master-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+                
+                localStorage.setItem('bq_token', data.token);
+                localStorage.setItem('bq_user', JSON.stringify(data.user));
+                localStorage.setItem('bq_login_type', 'master');
+                
+                window.location.href = 'master-dashboard.html';
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html>

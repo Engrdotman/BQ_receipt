@@ -76,6 +76,8 @@ header {
 .nav-links {
     display: flex;
     gap: 2rem;
+    position: relative;
+    z-index: 100;
 }
 
 .nav-links a {
@@ -85,6 +87,9 @@ header {
     padding: 0.5rem 1rem;
     border-radius: 8px;
     transition: var(--transition);
+    position: relative;
+    z-index: 101;
+    cursor: pointer;
 }
 
 .nav-links a:hover, .nav-links a.active {
@@ -229,6 +234,48 @@ tr:hover {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    .animate-fade{
+        padding: 1rem;
+        width: 100%;
+        margin-bottom: 1rem;
+        margin-top: 1rem;
+        margin-left: 1rem;
+        margin-right: 1rem;
+    }
+    /* Create Receipt specific */
+    .item-row {
+        flex-direction: column;
+        align-items: stretch !important;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 1.5rem !important;
+    }
+
+    .item-row .w-32 {
+        width: 100% !important;
+    }
+
+    .item-row div:last-child {
+        display: none; /* Hide spacer */
+    }
+
+    .btn-remove {
+        align-self: flex-end;
+    }
+
+    .form-actions {
+        text-align: center !important;
+        margin-top: 2rem !important;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        padding: 1rem !important;
+    }
+    
     .action-btns {
         flex-direction: column;
     }

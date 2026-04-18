@@ -14,3 +14,4 @@ CREATE TABLE IF NOT EXISTS receipts (
   total_amount DECIMAL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
