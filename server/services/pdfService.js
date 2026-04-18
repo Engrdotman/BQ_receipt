@@ -25,11 +25,19 @@ class PDFService {
 
     async getSign2Base64() {
         try {
-            const signPath = path.join(__dirname, '../templates/bq_sign2.jpeg');
+            // Try PNG first (transparent background), fallback to JPEG
+            let signPath = path.join(__dirname, '../templates/bq_sign2.png');
+            let mimeType = 'image/png';
+            try {
+                await fs.access(signPath);
+            } catch {
+                signPath = path.join(__dirname, '../templates/bq_sign2.jpeg');
+                mimeType = 'image/jpeg';
+            }
             const signBuffer = await fs.readFile(signPath);
-            return `data:image/jpeg;base64,${signBuffer.toString('base64')}`;
+            return `data:${mimeType};base64,${signBuffer.toString('base64')}`;
         } catch (error) {
-            console.error('Failed to read bq_sign2.jpeg:', error);
+            console.error('Failed to read signature image:', error);
             return '';
         }
     }

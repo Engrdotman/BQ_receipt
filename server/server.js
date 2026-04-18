@@ -12,7 +12,31 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+// CORS configuration - allow local and production origins
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [
+      'http://localhost:5500',
+      'http://localhost:3000',
+      'http://127.0.0.1:5500',
+      'http://127.0.0.1:3000'
+    ];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`❌ CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.use("/api/receipts", receiptRoutes);
@@ -23,10 +47,17 @@ app.get("/seed", async (req, res) => {
   try {
     const masterPool = getMasterPool();
     
-    const hashedPassword = await bcrypt.hash('master2026', 10);
+    // Use hashed passwords from .env
+    const masterPassword = process.env.MASTER_PASSWORD;
+    const clientPassword = process.env.DEFAULT_CLIENT_PASSWORD;
+    
+    if (!masterPassword || !clientPassword) {
+      return res.send("❌ Error: MASTER_PASSWORD and DEFAULT_CLIENT_PASSWORD not set in .env");
+    }
+    
     await masterPool.query(
-      'INSERT INTO master_users (username, password, role) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING',
-      ['master', hashedPassword, 'super_admin']
+      'INSERT INTO master_users (username, password, role) VALUES ($1, $2, $3) ON CONFLICT (username) DO UPDATE SET password = $2',
+      [process.env.MASTER_USERNAME || 'master', masterPassword, 'super_admin']
     );
     
     const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:hertheydotun@localhost:7085/BQ_receiptdb';
@@ -35,13 +66,12 @@ app.get("/seed", async (req, res) => {
       ['tenant_bq', 'BQ Receipt', 'bq_receipt', dbUrl, 'active']
     );
     
-    const clientPassword = await bcrypt.hash('admin2026', 10);
     await masterPool.query(
-      'INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, username) DO NOTHING',
-      ['tenant_bq', 'admin', clientPassword, 'admin']
+      'INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, username) DO UPDATE SET password = $3',
+      ['tenant_bq', process.env.DEFAULT_CLIENT_USERNAME || 'admin', clientPassword, 'admin']
     );
     
-    res.send("✅ Seed done! Master: master/master2026 | Client: admin/admin2026 | Tenant: bq_receipt");
+    res.send(`✅ Seed done! Master: ${process.env.MASTER_USERNAME || 'master'}/${process.env.MASTER_PASSWORD ? '(from .env)' : '(missing)'} | Client: ${process.env.DEFAULT_CLIENT_USERNAME || 'admin'}/${process.env.DEFAULT_CLIENT_PASSWORD ? '(from .env)' : '(missing)'}`);
   } catch (error) {
     res.send("Seed error: " + error.message);
   }
@@ -76,10 +106,11 @@ app.get("/test-db", async (req, res) => {
 
     // Check if admin exists, if not create one
     const adminCheck = await pool.query("SELECT * FROM users WHERE username = 'admin'");
-    if (adminCheck.rows.length === 0) {
-      const hashedPassword = await bcrypt.hash("$2a$10$kjsdfhksjdfhksjdfh...", 10);
-      await pool.query("INSERT INTO users (username, password, role) VALUES ($1, $2, $3)", ["admin", hashedPassword, "admin"]);
-      console.log("✅ Default admin user created (admin / admin2026)");
+    if (adminCheck.rows.length === 0 && process.env.DEFAULT_CLIENT_PASSWORD) {
+      await pool.query("INSERT INTO users (username, password, role) VALUES ($1, $2, $3)", [process.env.DEFAULT_CLIENT_USERNAME || 'admin', process.env.DEFAULT_CLIENT_PASSWORD, "admin"]);
+      console.log("✅ Default admin user created");
+    } else if (adminCheck.rows.length === 0) {
+      console.log("⚠️ DEFAULT_CLIENT_PASSWORD not set in .env, skipping client DB user creation");
     } else {
       console.log("ℹ️ Admin user 'admin' already exists in database");
     }
@@ -109,13 +140,15 @@ app.get("/check-admin", async (req, res) => {
 
 app.get("/reset-admin", async (req, res) => {
   try {
-    const hashedPassword = await bcrypt.hash("admin2026", 10);
+    if (!process.env.DEFAULT_CLIENT_PASSWORD) {
+      return res.status(500).json({ error: "DEFAULT_CLIENT_PASSWORD not set in .env" });
+    }
     await pool.query(`
       INSERT INTO users (username, password, role) 
       VALUES ('admin', $1, 'admin')
       ON CONFLICT (username) DO UPDATE SET password = $1
-    `, [hashedPassword]);
-    res.json({ message: "Admin reset - use admin / admin2026" });
+    `, [process.env.DEFAULT_CLIENT_PASSWORD]);
+    res.json({ message: "Admin reset - use admin with password from .env" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -20,6 +20,94 @@
         }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .nav {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            .nav-links {
+                gap: 0.5rem;
+            }
+            .nav-links a {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.9rem;
+            }
+            .nav-actions {
+                font-size: 0.9rem;
+            }
+            /* Grid to single column */
+            .form-card > form > div[style*="grid-template-columns"] {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0 !important;
+            }
+            .form-card .form-group {
+                margin-bottom: 1rem;
+            }
+            /* Search section */
+            .form-card > div[style*="justify-content"] {
+                flex-direction: column !important;
+                gap: 1rem !important;
+                align-items: stretch !important;
+            }
+            #searchInput {
+                width: 100% !important;
+                max-width: none !important;
+            }
+            /* Item rows stack */
+            .item-row {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 0.5rem !important;
+            }
+            .w-32, .w-40 {
+                width: 100% !important;
+            }
+            .item-row > div:last-child {
+                display: none !important;
+            }
+            .btn-remove {
+                align-self: flex-end;
+            }
+            /* Form actions center */
+            .form-actions {
+                text-align: center !important;
+                margin-top: 2rem !important;
+            }
+            .form-actions .btn {
+                width: 100%;
+                padding: 1rem !important;
+            }
+            /* Table responsive */
+            .table-container {
+                overflow-x: auto;
+            }
+            table {
+                min-width: 600px;
+            }
+            /* Action buttons vertical */
+            .action-btns {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+            .action-btns button {
+                width: 100%;
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-card, .form-card {
+                padding: 1.5rem 1rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
     </style>
 </head>
 <body>

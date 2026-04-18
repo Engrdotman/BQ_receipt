@@ -9,14 +9,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --bg: #0a0a0a;
+            --bg-secondary: #111;
+            --border: #222;
+            --text: #fff;
+            --text-secondary: #888;
+            --success: #10b981;
+            --error: #ef4444;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            background: #0a0a0a;
-            color: #fff;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 1rem;
         }
         .master-container {
             width: 100%;
@@ -24,8 +36,8 @@
             padding: 2rem;
         }
         .master-card {
-            background: #111;
-            border: 1px solid #222;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
             border-radius: 16px;
             padding: 2.5rem;
         }
@@ -48,6 +60,7 @@
         .master-header h1 {
             font-size: 1.5rem;
             font-weight: 600;
+            margin-bottom: 0.5rem;
         }
         .master-header p {
             color: #666;
@@ -71,10 +84,12 @@
             border-radius: 8px;
             color: #fff;
             font-size: 0.95rem;
+            transition: all 0.3s ease;
         }
         .form-group input:focus {
             outline: none;
             border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
         }
         .btn-master {
             width: 100%;
@@ -87,9 +102,11 @@
             font-weight: 600;
             cursor: pointer;
             margin-top: 0.5rem;
+            transition: var(--transition, all 0.3s ease);
         }
         .btn-master:hover {
             opacity: 0.9;
+            transform: translateY(-1px);
         }
         .back-link {
             display: block;
@@ -114,6 +131,49 @@
             margin-top: 1rem;
         }
         .error-message.show { display: block; }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+                padding: 0.5rem;
+            }
+            .master-container {
+                padding: 1rem;
+                max-width: 100%;
+            }
+            .master-card {
+                padding: 2rem 1.5rem;
+                border-radius: 12px;
+            }
+            .master-header h1 {
+                font-size: 1.3rem;
+            }
+            .master-header p {
+                font-size: 0.85rem;
+            }
+            .form-group input {
+                padding: 10px 12px;
+                font-size: 0.9rem;
+            }
+            .btn-master {
+                padding: 12px;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .master-card {
+                padding: 1.5rem 1rem;
+            }
+            .master-badge {
+                font-size: 0.65rem;
+                padding: 0.3rem 0.8rem;
+            }
+            .master-header h1 {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>

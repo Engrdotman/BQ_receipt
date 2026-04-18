@@ -52,15 +52,18 @@ router.post('/seed', async (req, res) => {
     try {
         const pool = getMasterPool();
         
+        if (!process.env.MASTER_PASSWORD || !process.env.DEFAULT_CLIENT_PASSWORD) {
+            return res.status(500).json({ error: 'MASTER_PASSWORD and DEFAULT_CLIENT_PASSWORD must be set in .env' });
+        }
+        
         // Check if master user exists
-        const userCheck = await pool.query("SELECT * FROM master_users WHERE username = 'master'");
+        const userCheck = await pool.query("SELECT * FROM master_users WHERE username = $1", [process.env.MASTER_USERNAME || 'master']);
         if (userCheck.rows.length === 0) {
-            const hashedPassword = await bcrypt.hash('master2026', 10);
             await pool.query(
                 'INSERT INTO master_users (username, password, role) VALUES ($1, $2, $3)',
-                ['master', hashedPassword, 'super_admin']
+                [process.env.MASTER_USERNAME || 'master', process.env.MASTER_PASSWORD, 'super_admin']
             );
-            console.log('✅ Master user created (master / master2026)');
+            console.log('✅ Master user created');
         }
         
         // Check if bq_receipt tenant exists
@@ -72,6 +75,16 @@ router.post('/seed', async (req, res) => {
                 ['tenant_bq', 'BQ Receipt', 'bq_receipt', dbUrl, 'active']
             );
             console.log('✅ BQ Receipt tenant created');
+        }
+        
+        // Check if client user exists
+        const clientCheck = await pool.query("SELECT * FROM users WHERE tenant_id = $1 AND username = $2", ['tenant_bq', process.env.DEFAULT_CLIENT_USERNAME || 'admin']);
+        if (clientCheck.rows.length === 0) {
+            await pool.query(
+                'INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4)',
+                ['tenant_bq', process.env.DEFAULT_CLIENT_USERNAME || 'admin', process.env.DEFAULT_CLIENT_PASSWORD, 'admin']
+            );
+            console.log('✅ Client user created');
         }
         
         res.json({ message: 'Seed completed' });

@@ -1,7 +1,21 @@
 const ENV = {
-    API_URL: import.meta.env?.VITE_API_URL || 'http://localhost:5000/api',
+    // VITE_API_URL for Vercel/deployed, fallback to localhost for development
+    API_URL: import.meta.env?.VITE_API_URL || 'https://bq-receipt.vercel.app',
     TIMEOUT: 30000
 };
+
+// Dynamic API URL based on environment
+const getApiUrl = () => {
+    if (import.meta.env?.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+    // For local development, check if there's a stored preference
+    return localStorage.getItem('api_url') || 'http://localhost:5000/api';
+
+    // For local development, check if there's a stored preference
+};
+
+const setApiUrl = (url) => localStorage.setItem('api_url', url);
 
 const getToken = () => localStorage.getItem('bq_token');
 const setToken = (token) => localStorage.setItem('bq_token', token);
@@ -15,7 +29,7 @@ const setUser = (user) => localStorage.setItem('bq_user', JSON.stringify(user));
 const removeUser = () => localStorage.removeItem('bq_user');
 
 async function request(endpoint, options = {}) {
-    const url = `${ENV.API_URL}${endpoint}`;
+    const url = `${getApiUrl()}${endpoint}`;
     const token = getToken();
     const headers = {
         'Content-Type': 'application/json',
@@ -97,7 +111,7 @@ export const receipts = {
     download: async (id) => {
         try {
             const token = getToken();
-            const response = await fetch(`${ENV.API_URL}/receipts/download/${id}`, {
+            const response = await fetch(`${getApiUrl()}/receipts/download/${id}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
