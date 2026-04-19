@@ -336,35 +336,27 @@
     </div>
 
     <script type="module">
-        const API_URL = 'http://localhost:5000/api';
-        
-        function getToken() {
-            return localStorage.getItem('bq_token');
-        }
-        
-        if (!getToken()) {
+        import { auth, master } from '../js/api.js';
+
+        if (!auth.isAuthenticated()) {
             window.location.href = 'master-login.html';
         }
-        
-        const user = JSON.parse(localStorage.getItem('bq_user') || '{}');
-        document.getElementById('userName').textContent = user.username || 'master';
-        
+
+        const user = auth.getCurrentUser();
+        document.getElementById('userName').textContent = user?.username || 'master';
+
         async function loadTenants() {
             try {
-                const response = await fetch(`${API_URL}/master/tenants`, {
-                    headers: { 'Authorization': `Bearer ${getToken()}` }
-                });
-                const tenants = await response.json();
-                
+                const tenants = await master.getTenants();
                 const tbody = document.getElementById('tenantsTable');
                 if (!tenants.length) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tenants found</td></tr>';
                     return;
                 }
-                
+
                 document.getElementById('tenantCount').textContent = tenants.length;
                 document.getElementById('activeCount').textContent = tenants.filter(t => t.status === 'active').length;
-                
+
                 tbody.innerHTML = tenants.map(t => `
                     <tr>
                         <td style="font-weight: 500;">${t.name}</td>
@@ -389,7 +381,7 @@
                 console.error('Failed to load tenants:', error);
             }
         }
-        
+
         // ── Modal open / close ────────────────────────────────────────
         const addModal = document.getElementById('addTenantModal');
         const addModalOpen  = () => { addModal.style.display = 'flex'; document.getElementById('addTenantForm').reset(); };
@@ -426,13 +418,10 @@
             manageModalOpen(tenant);
         });
 
-        // ── Logout: clear storage then redirect ───────────────────────────
+        // ── Logout ───────────────────────────
         document.getElementById('masterLogoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
-            localStorage.removeItem('bq_token');
-            localStorage.removeItem('bq_user');
-            localStorage.removeItem('bq_login_type');
-            window.location.href = 'master-login.html';
+            auth.logout();
         });
 
         // ── Add Tenant form submit ─────────────────────────────────────────
@@ -449,22 +438,8 @@
             };
 
             try {
-                const response = await fetch(`${API_URL}/master/register`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${getToken()}`
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.error || 'Failed to add tenant');
-                }
-
-                closeModal();
+                await master.registerTenant(data);
+                addModalClose();
                 loadTenants();
             } catch (error) {
                 alert('Error: ' + error.message);

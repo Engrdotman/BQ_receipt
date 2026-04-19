@@ -12,8 +12,8 @@ export const checkAuth = (redirect = true) => {
 
 export const getUser = () => auth.getCurrentUser();
 
-export const login = async (username, password) => {
-    return await auth.login({ username, password });
+export const login = async (username, password, organization = 'bq_receipt') => {
+    return await auth.login({ username, password, tenant: organization });
 };
 
 export const handleLogout = () => {
@@ -24,7 +24,7 @@ export const initAuthUI = () => {
     const user = getUser();
     if (user) {
         const userEl = document.getElementById('userName');
-        if (userEl) userEl.textContent = user.username;
+        if (userEl) userEl.textContent = user.username || user.user_id;
     }
 };
 

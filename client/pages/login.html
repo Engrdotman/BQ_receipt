@@ -197,36 +197,21 @@
     </div>
 
     <script type="module">
-        const API_URL = 'http://localhost:5000/api';
-        
+        import { auth } from '../js/api.js';
+
         const loginForm = document.getElementById('loginForm');
         const loginError = document.getElementById('loginError');
-        
+
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             loginError.classList.remove('show');
-            
+
             const organization = document.getElementById('organization').value;
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            
+
             try {
-                const response = await fetch(`${API_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tenant: organization, username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Invalid credentials');
-                }
-                
-                localStorage.setItem('bq_token', data.token);
-                localStorage.setItem('bq_user', JSON.stringify(data.user));
-                localStorage.setItem('bq_login_type', data.type);
-                
+                const response = await auth.login({ tenant: organization, username, password });
                 window.location.href = 'dashboard.html';
             } catch (error) {
                 loginError.textContent = error.message;

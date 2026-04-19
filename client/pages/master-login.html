@@ -205,32 +205,17 @@
     </div>
 
     <script type="module">
-        const API_URL = 'http://localhost:5000/api';
-        
+        import { auth } from '../js/api.js';
+
         document.getElementById('masterLoginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('loginError');
-            
+
             try {
-                const response = await fetch(`${API_URL}/auth/master-login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Login failed');
-                }
-                
-                localStorage.setItem('bq_token', data.token);
-                localStorage.setItem('bq_user', JSON.stringify(data.user));
-                localStorage.setItem('bq_login_type', 'master');
-                
+                await auth.masterLogin({ username, password });
                 window.location.href = 'master-dashboard.html';
             } catch (error) {
                 errorDiv.textContent = error.message;

@@ -1,7 +1,8 @@
 const ENV = {
     // VITE_API_URL for Vercel/deployed, fallback to localhost for development
-    API_URL: import.meta.env?.VITE_API_URL || 'https://bq-receipt.vercel.app',
-    TIMEOUT: 30000
+    API_URL: import.meta.env?.VITE_API_URL || 'http://localhost:5000/api',
+    TIMEOUT: 30000,
+    CLIENT_URL: import.meta.env?.VITE_CLIENT_URL || 'http://localhost:5500',
 };
 
 // Dynamic API URL based on environment
@@ -11,8 +12,6 @@ const getApiUrl = () => {
     }
     // For local development, check if there's a stored preference
     return localStorage.getItem('api_url') || 'http://localhost:5000/api';
-
-    // For local development, check if there's a stored preference
 };
 
 const setApiUrl = (url) => localStorage.setItem('api_url', url);
@@ -20,6 +19,41 @@ const setApiUrl = (url) => localStorage.setItem('api_url', url);
 const getToken = () => localStorage.getItem('bq_token');
 const setToken = (token) => localStorage.setItem('bq_token', token);
 const removeToken = () => localStorage.removeItem('bq_token');
+
+const getRefreshToken = () => localStorage.getItem('bq_refresh_token');
+const setRefreshToken = (rt) => localStorage.setItem('bq_refresh_token', rt);
+const removeRefreshToken = () => localStorage.removeItem('bq_refresh_token');
+
+async function refreshAccessToken() {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${getApiUrl()}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Refresh failed');
+        }
+
+        setToken(data.token);
+        setRefreshToken(data.refreshToken);
+        setUser(data.user);
+        return true;
+    } catch (error) {
+        console.error('Token refresh failed:', error);
+        removeToken();
+        removeRefreshToken();
+        return false;
+    }
+}
 
 const getUser = () => {
     const user = localStorage.getItem('bq_user');
@@ -55,8 +89,22 @@ async function request(endpoint, options = {}) {
 
         if (!response.ok) {
             if (response.status === 401) {
-                logout();
-                throw new Error('Session expired. Please login again.');
+                // Try to refresh token once
+                try {
+                    const refreshed = await refreshAccessToken();
+                    if (refreshed) {
+                        // Retry original request with new token
+                        headers.Authorization = `Bearer ${getToken()}`;
+                        const retryResponse = await fetch(url, { ...options, headers, signal: controller.signal });
+                        const retryData = await retryResponse.json();
+                        if (!retryResponse.ok) throw new Error(retryData.error || 'Request failed');
+                        return retryData;
+                    }
+                } catch (refreshError) {
+                    console.error('Refresh failed:', refreshError);
+                    logout();
+                    throw new Error('Session expired. Please login again.');
+                }
             }
             throw new Error(data.error || 'Request failed');
         }
@@ -79,12 +127,39 @@ export const auth = {
             body: JSON.stringify(credentials)
         });
         setToken(data.token);
+        setRefreshToken(data.refreshToken);
         setUser(data.user);
         return data;
     },
 
+    masterLogin: async (credentials) => {
+        const data = await request('/auth/master-login', {
+            method: 'POST',
+            body: JSON.stringify(credentials)
+        });
+        setToken(data.token);
+        setRefreshToken(data.refreshToken);
+        setUser(data.user);
+        return data;
+    },
+
+    forgotPassword: async (data) => {
+        return request('/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    resetPassword: async (data) => {
+        return request('/auth/reset-password', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
     logout: () => {
         removeToken();
+        removeRefreshToken();
         removeUser();
         window.location.href = 'login.html';
     },
@@ -93,6 +168,29 @@ export const auth = {
 
     getCurrentUser: () => getUser()
 };
+
+export const master = {
+    getTenants: async () => {
+        const token = getToken();
+        return request('/master/tenants', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    registerTenant: async (tenantData) => {
+        const token = getToken();
+        return request('/master/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(tenantData)
+        });
+    }
+};
+
+export { getApiUrl };
 
 export const receipts = {
     getAll: () => request('/receipts'),
