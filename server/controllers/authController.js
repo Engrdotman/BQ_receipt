@@ -1,6 +1,98 @@
 import bcrypt from 'bcryptjs';
-import { generateToken } from '../utils/generateToken.js';
+import { generateToken, verifyToken, generateRefreshToken } from '../utils/generateToken.js';
 import { getMasterPool } from '../config/masterDb.js';
+
+// ─────────────────────────────────────────────
+//  REFRESH TOKEN
+// ─────────────────────────────────────────────
+export const refreshToken = async (req, res) => {
+    const { refreshToken: rt } = req.body;
+
+    if (!rt) {
+        return res.status(401).json({ error: 'Refresh token required' });
+    }
+
+    try {
+        const jwt = await import('jsonwebtoken');
+        const decoded = jwt.default.verify(rt, process.env.JWT_REFRESH_SECRET || 'refresh_secret');
+
+        const masterPool = getMasterPool();
+
+        // Check if refresh token exists and is not revoked
+        const tokenCheck = await masterPool.query(
+            'SELECT * FROM refresh_tokens WHERE token = $1 AND revoked = false',
+            [rt]
+        );
+
+        if (tokenCheck.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid refresh token' });
+        }
+
+        const storedToken = tokenCheck.rows[0];
+
+        // Check if expired
+        if (new Date() > storedToken.expires_at) {
+            // Mark as revoked
+            await masterPool.query('UPDATE refresh_tokens SET revoked = true WHERE id = $1', [storedToken.id]);
+            return res.status(401).json({ error: 'Refresh token expired' });
+        }
+
+        // Check if user still exists
+        const userResult = await masterPool.query(
+            'SELECT id, username, role, tenant_id FROM users WHERE id = $1',
+            [decoded.user_id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+
+        // Revoke old refresh token
+        await masterPool.query('UPDATE refresh_tokens SET revoked = true WHERE id = $1', [storedToken.id]);
+
+        // Generate new tokens
+        const newAccessToken = generateToken({
+            user_id: user.id,
+            username: user.username,
+            role: user.role,
+            tenant_id: user.tenant_id,
+            type: 'client'
+        }, '8h');
+
+        const newRefreshToken = generateRefreshToken({
+            user_id: user.id,
+            username: user.username,
+            role: user.role,
+            tenant_id: user.tenant_id
+        });
+
+        // Store new refresh token
+        await masterPool.query(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+            [user.id, newRefreshToken]
+        );
+
+        return res.json({
+            token: newAccessToken,
+            refreshToken: newRefreshToken,
+            user: {
+                user_id: user.id,
+                username: user.username,
+                role: user.role,
+                tenant_id: user.tenant_id
+            }
+        });
+
+    } catch (error) {
+        if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ error: 'Invalid refresh token' });
+        }
+        console.error('[refreshToken] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to refresh token' });
+    }
+};
 
 // ─────────────────────────────────────────────
 //  MASTER LOGIN  (Super Admin → master_users)
@@ -39,6 +131,19 @@ export const masterLogin = async (req, res) => {
             type: 'master'
         }, '8h');
 
+        const refreshToken = generateRefreshToken({
+            user_id: user.id,
+            username: user.username,
+            role: user.role,
+            type: 'master'
+        });
+
+        // Store refresh token
+        await masterPool.query(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+            [user.id, refreshToken]
+        );
+
         await masterPool.query(
             'UPDATE master_users SET last_login = NOW() WHERE id = $1',
             [user.id]
@@ -46,6 +151,7 @@ export const masterLogin = async (req, res) => {
 
         return res.json({
             token,
+            refreshToken,
             user: {
                 user_id: user.id,
                 username: user.username,
@@ -126,7 +232,9 @@ export const forgotPassword = async (req, res) => {
             [user.id, resetToken]
         );
 
-        return res.json({ message: 'Password reset instructions have been sent to your registered email.' });
+        const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${resetToken}`;
+
+        return res.json({ message: 'Password reset instructions have been sent to your registered email.', resetUrl });
     } catch (error) {
         console.error('[forgotPassword] Error:', error.message);
         return res.status(500).json({ error: 'Failed to process request' });
@@ -225,6 +333,19 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
         type: 'client'
     }, '8h');
 
+    const refreshToken = generateRefreshToken({
+        user_id: user.id,
+        username: user.username,
+        role: user.role,
+        tenant_id: user.tenant_id
+    });
+
+    // Store refresh token in database
+    await masterPool.query(
+        'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+        [user.id, refreshToken]
+    );
+
     await masterPool.query(
         'UPDATE users SET last_login = NOW() WHERE id = $1',
         [user.id]
@@ -232,6 +353,7 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
 
     return res.json({
         token,
+        refreshToken,
         user: {
             user_id: user.id,
             tenant_id: user.tenant_id,

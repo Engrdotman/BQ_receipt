@@ -20,7 +20,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://localhost:3000',
       'http://127.0.0.1:5500',
       'http://127.0.0.1:3000',
-      process.env.CLIENT_URL
+      'https://bq-receipt.vercel.app' 
     ];
 
 app.use(cors({
@@ -61,7 +61,10 @@ app.get("/seed", async (req, res) => {
       [process.env.MASTER_USERNAME || 'master', masterPassword, 'super_admin']
     );
     
-    const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:hertheydotun@localhost:7085/BQ_receiptdb';
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      return res.send("❌ Error: DATABASE_URL not set in .env");
+    }
     await masterPool.query(
       'INSERT INTO tenants (tenant_id, name, slug, database_url, status) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (slug) DO NOTHING',
       ['tenant_bq', 'BQ Receipt', 'bq_receipt', dbUrl, 'active']

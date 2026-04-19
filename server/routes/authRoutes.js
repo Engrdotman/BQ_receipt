@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, forgotPassword, resetPassword, masterLogin } from '../controllers/authController.js';
+import { login, forgotPassword, resetPassword, masterLogin, refreshToken } from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -30,6 +30,14 @@ router.post('/forgot-password', async (req, res, next) => {
 router.post('/reset-password', async (req, res, next) => {
     try {
         await resetPassword(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/refresh', async (req, res, next) => {
+    try {
+        await refreshToken(req, res);
     } catch (error) {
         next(error);
     }
