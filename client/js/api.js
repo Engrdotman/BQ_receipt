@@ -1,17 +1,14 @@
 const ENV = {
-    // VITE_API_URL for Vercel/deployed, fallback to localhost for development
-    API_URL: import.meta.env?.VITE_API_URL || 'http://localhost:5000/api',
+    API_URL: import.meta.env?.VITE_API_URL || 'https://bqreceipt-production.up.railway.app/api',
     TIMEOUT: 30000,
-    CLIENT_URL: import.meta.env?.VITE_CLIENT_URL || 'http://localhost:5500',
+    CLIENT_URL: import.meta.env?.VITE_CLIENT_URL || 'https://bq-receipt.vercel.app',
 };
 
-// Dynamic API URL based on environment
 const getApiUrl = () => {
     if (import.meta.env?.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    // For local development, check if there's a stored preference
-    return localStorage.getItem('api_url') || 'http://localhost:5000/api';
+    return localStorage.getItem('api_url') || 'https://bqreceipt-production.up.railway.app/api';
 };
 
 const setApiUrl = (url) => localStorage.setItem('api_url', url);
