@@ -1,17 +1,47 @@
 const ENV = {
-    API_URL: import.meta.env?.VITE_API_URL || 'https://bqreceipt-production.up.railway.app/api',
     TIMEOUT: 30000,
     CLIENT_URL: import.meta.env?.VITE_CLIENT_URL || 'https://bq-receipt.vercel.app',
+    // Predefined API endpoints for easy switching
+    API_ENDPOINTS: [
+        { name: 'Production', url: 'https://bqreceipt-production.up.railway.app/api' },
+        { name: 'Localhost 5000', url: 'http://localhost:5000/api' },
+        { name: 'Localhost 3000', url: 'http://localhost:3000/api' },
+        { name: 'Localhost 5500', url: 'http://localhost:5500/api' },
+        { name: '127.0.0.1:5000', url: 'http://127.0.0.1:5000/api' },
+        { name: '127.0.0.1:3000', url: 'http://127.0.0.1:3000/api' },
+    ]
 };
 
 const getApiUrl = () => {
+    // 1. Check environment variable first
     if (import.meta.env?.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    return localStorage.getItem('api_url') || 'https://bqreceipt-production.up.railway.app/api';
+    
+    // 2. Check localStorage for saved preference
+    const savedUrl = localStorage.getItem('api_url');
+    if (savedUrl) {
+        return savedUrl;
+    }
+    
+    // 3. Return production default
+    return 'https://bqreceipt-production.up.railway.app/api';
 };
 
 const setApiUrl = (url) => localStorage.setItem('api_url', url);
+
+// Helper to list available endpoints (for debugging or UI)
+const getAvailableEndpoints = () => ENV.API_ENDPOINTS;
+
+// Helper to switch endpoint by name
+const switchApiEndpoint = (name) => {
+    const endpoint = ENV.API_ENDPOINTS.find(e => e.name === name);
+    if (endpoint) {
+        setApiUrl(endpoint.url);
+        return endpoint.url;
+    }
+    return null;
+};
 
 const getToken = () => localStorage.getItem('bq_token');
 const setToken = (token) => localStorage.setItem('bq_token', token);
@@ -187,7 +217,7 @@ export const master = {
     }
 };
 
-export { getApiUrl };
+export { getApiUrl, getAvailableEndpoints, switchApiEndpoint };
 
 export const receipts = {
     getAll: () => request('/receipts'),
