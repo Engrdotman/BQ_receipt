@@ -87,6 +87,47 @@ export const initializeMasterDatabase = async () => {
             } catch (e) {
                 console.warn("⚠️ Could not verify users schema:", e.message);
             }
+
+            // Fix tenants.tenant_id if it was created as SERIAL/integer instead of VARCHAR(50)
+            try {
+                const tenantIdTypeCheck = await masterPool.query(`
+                    SELECT data_type
+                    FROM information_schema.columns
+                    WHERE table_name = 'tenants' AND column_name = 'tenant_id'
+                `);
+                if (tenantIdTypeCheck.rows.length > 0 && tenantIdTypeCheck.rows[0].data_type === 'integer') {
+                    console.log("⚠️ tenants.tenant_id is integer — migrating to VARCHAR(50)...");
+                    await masterPool.query(`
+                        ALTER TABLE tenants
+                            DROP CONSTRAINT IF EXISTS tenants_tenant_id_key,
+                            ALTER COLUMN tenant_id TYPE VARCHAR(50) USING tenant_id::text
+                    `);
+                    await masterPool.query(`
+                        ALTER TABLE tenants
+                            ADD CONSTRAINT tenants_tenant_id_key UNIQUE (tenant_id)
+                    `);
+                    console.log("✅ Migrated tenants.tenant_id to VARCHAR(50)");
+                }
+            } catch (e) {
+                console.warn("⚠️ Could not migrate tenants.tenant_id:", e.message);
+            }
+
+            // Ensure refresh_tokens has revoked column (for existing deployments)
+            try {
+                const revokedCheck = await masterPool.query(`
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'refresh_tokens' AND column_name = 'revoked'
+                `);
+                if (revokedCheck.rows.length === 0) {
+                    console.log("⚠️ refresh_tokens.revoked column missing, adding it...");
+                    await masterPool.query(`ALTER TABLE refresh_tokens ADD COLUMN revoked BOOLEAN DEFAULT FALSE`);
+                    await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked ON refresh_tokens(revoked)`);
+                    console.log("✅ Added revoked column to refresh_tokens");
+                }
+            } catch (e) {
+                console.warn("⚠️ Could not verify refresh_tokens schema:", e.message);
+            }
         }
 
         // Ensure refresh_tokens and password_resets tables
