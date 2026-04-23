@@ -103,6 +103,26 @@ app.get("/seed", async (req, res) => {
     `);
     console.log("✅ Tables created/verified");
     
+    // Fix: Add tenant_id column if it doesn't exist (migration for old schema)
+    try {
+      await masterPool.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(50) UNIQUE`);
+      await masterPool.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS name VARCHAR(100)`);
+      await masterPool.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS slug VARCHAR(50) UNIQUE`);
+      await masterPool.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS database_url TEXT`);
+      await masterPool.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
+      console.log("✅ Tenants table schema updated");
+    } catch (migrateErr) {
+      console.log("ℹ️ Migration note:", migrateErr.message);
+    }
+    
+    // Fix: Add tenant_id to users table if missing
+    try {
+      await masterPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(50)`);
+      console.log("✅ Users table schema updated");
+    } catch (migrateErr) {
+      console.log("ℹ️ Users migration note:", migrateErr.message);
+    }
+    
     // Check environment variables
     if (!process.env.MASTER_PASSWORD || !process.env.DEFAULT_CLIENT_PASSWORD || !process.env.DATABASE_URL) {
       return res.send("❌ Error: MASTER_PASSWORD, DEFAULT_CLIENT_PASSWORD, and DATABASE_URL must be set in .env");
