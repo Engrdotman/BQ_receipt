@@ -89,6 +89,13 @@ export const initializeMasterDatabase = async () => {
             }
         }
 
+        // Drop and recreate tables to fix corrupted/inconsistent schema
+        await masterPool.query(`
+            DROP TABLE IF EXISTS refresh_tokens CASCADE;
+            DROP TABLE IF EXISTS password_resets CASCADE;
+            DROP TABLE IF EXISTS users CASCADE;
+        `);
+
         // Ensure refresh_tokens and password_resets tables
         await masterPool.query(`
             CREATE TABLE IF NOT EXISTS refresh_tokens (
