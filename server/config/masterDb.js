@@ -89,6 +89,15 @@ export const initializeMasterDatabase = async () => {
             }
         }
 
+        // Drop corrupted tables one by one to ensure clean schema
+        console.log("🗑️ Dropping corrupted auth tables for schema rebuild...");
+        await masterPool.query(`DROP TABLE IF EXISTS refresh_tokens CASCADE`);
+        await masterPool.query(`DROP TABLE IF EXISTS password_resets CASCADE`);
+        await masterPool.query(`DROP TABLE IF EXISTS users CASCADE`);
+        await masterPool.query(`DROP TABLE IF EXISTS master_users CASCADE`);
+        await masterPool.query(`DROP TABLE IF EXISTS tenants CASCADE`);
+        console.log("✅ Corrupted tables dropped");
+
         // Ensure refresh_tokens and password_resets tables
         await masterPool.query(`
             CREATE TABLE IF NOT EXISTS refresh_tokens (
