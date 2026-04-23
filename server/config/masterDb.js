@@ -56,40 +56,9 @@ export const initializeMasterDatabase = async () => {
             }
         } else {
             console.log("✅ Master database tables exist");
-            
-            // Ensure users table has all required columns (for existing deployments)
-            try {
-                // Check if users table has password column
-                const colCheck = await masterPool.query(`
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'users' AND column_name = 'password'
-                `);
-                if (colCheck.rows.length === 0) {
-                    console.log("⚠️ users.password column missing, adding it...");
-                    await masterPool.query(`ALTER TABLE users ADD COLUMN password TEXT`);
-                    console.log("✅ Added password column to users");
-                }
-                
-                // Check if users table has tenant_id column
-                const tenantCheck = await masterPool.query(`
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'users' AND column_name = 'tenant_id'
-                `);
-                if (tenantCheck.rows.length === 0) {
-                    console.log("⚠️ users.tenant_id column missing, adding it...");
-                    await masterPool.query(`ALTER TABLE users ADD COLUMN tenant_id VARCHAR(50)`);
-                    // Create index
-                    await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)`);
-                    console.log("✅ Added tenant_id column to users");
-                }
-            } catch (e) {
-                console.warn("⚠️ Could not verify users schema:", e.message);
-            }
         }
 
-        // Ensure refresh_tokens and password_resets tables
+        // Ensure refresh_tokens and password_resets tables exist with all required columns
         await masterPool.query(`
             CREATE TABLE IF NOT EXISTS refresh_tokens (
                 id SERIAL PRIMARY KEY,
@@ -113,6 +82,18 @@ export const initializeMasterDatabase = async () => {
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked ON refresh_tokens(revoked);
             CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
         `);
+
+        // Migrate existing tables: add any missing columns unconditionally using IF NOT EXISTS
+        // This is safe to run on every startup — Postgres will no-op if the column already exists
+        try {
+            await masterPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
+            await masterPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(50)`);
+            await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)`);
+            await masterPool.query(`ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT FALSE`);
+            console.log("✅ Schema migrations applied");
+        } catch (e) {
+            console.warn("⚠️ Could not apply schema migrations:", e.message);
+        }
 
         console.log("✅ Master database initialized");
         
