@@ -37,11 +37,21 @@ export const refreshToken = async (req, res) => {
             return res.status(401).json({ error: 'Refresh token expired' });
         }
 
-        // Check if user still exists
-        const userResult = await masterPool.query(
-            'SELECT id, username, role, tenant_id FROM users WHERE id = $1',
-            [decoded.user_id]
-        );
+        // Check if user still exists based on user_type
+        const userType = storedToken.user_type || decoded.type || 'client';
+        let userResult;
+
+        if (userType === 'master') {
+            userResult = await masterPool.query(
+                'SELECT id, username, role FROM master_users WHERE id = $1',
+                [decoded.user_id]
+            );
+        } else {
+            userResult = await masterPool.query(
+                'SELECT id, username, role, tenant_id FROM users WHERE id = $1',
+                [decoded.user_id]
+            );
+        }
 
         if (userResult.rows.length === 0) {
             return res.status(401).json({ error: 'User not found' });
@@ -53,25 +63,24 @@ export const refreshToken = async (req, res) => {
         await masterPool.query('UPDATE refresh_tokens SET revoked = true WHERE id = $1', [storedToken.id]);
 
         // Generate new tokens
-        const newAccessToken = generateToken({
+        const tokenPayload = {
             user_id: user.id,
             username: user.username,
             role: user.role,
-            tenant_id: user.tenant_id,
-            type: 'client'
-        }, '8h');
+            type: userType
+        };
 
-        const newRefreshToken = generateRefreshToken({
-            user_id: user.id,
-            username: user.username,
-            role: user.role,
-            tenant_id: user.tenant_id
-        });
+        if (userType === 'client') {
+            tokenPayload.tenant_id = user.tenant_id;
+        }
+
+        const newAccessToken = generateToken(tokenPayload, '8h');
+        const newRefreshToken = generateRefreshToken(tokenPayload);
 
         // Store new refresh token
         await masterPool.query(
-            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
-            [user.id, newRefreshToken]
+            'INSERT INTO refresh_tokens (user_id, user_type, token, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'7 days\')',
+            [user.id, userType, newRefreshToken]
         );
 
         return res.json({
@@ -81,7 +90,8 @@ export const refreshToken = async (req, res) => {
                 user_id: user.id,
                 username: user.username,
                 role: user.role,
-                tenant_id: user.tenant_id
+                tenant_id: user.tenant_id,
+                type: userType
             }
         });
 
@@ -140,8 +150,8 @@ export const masterLogin = async (req, res) => {
 
         // Store refresh token
         await masterPool.query(
-            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
-            [user.id, refreshToken]
+            'INSERT INTO refresh_tokens (user_id, user_type, token, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'7 days\')',
+            [user.id, 'master', refreshToken]
         );
 
         await masterPool.query(
@@ -155,7 +165,8 @@ export const masterLogin = async (req, res) => {
             user: {
                 user_id: user.id,
                 username: user.username,
-                role: user.role
+                role: user.role,
+                type: 'master'
             }
         });
     } catch (error) {
@@ -293,19 +304,24 @@ export const resetPassword = async (req, res) => {
 //  4. Issue JWT with user_id, tenant_id, role ONLY
 // ─────────────────────────────────────────────
 async function tenantLogin(req, res, username, password, tenantSlug) {
+    console.log(`[tenantLogin] Attempting login for user: ${username}, tenant: ${tenantSlug}`);
+    
     const masterPool = getMasterPool();
 
     // Step 1 — resolve tenant
     const tenantResult = await masterPool.query(
-        'SELECT tenant_id FROM tenants WHERE slug = $1 AND status = $2',
-        [tenantSlug, 'active']
+        'SELECT tenant_id, name, slug, status FROM tenants WHERE slug = $1',
+        [tenantSlug]
     );
+
+    console.log('[tenantLogin] Tenant query result:', tenantResult.rows);
 
     if (tenantResult.rows.length === 0) {
         return res.status(401).json({ error: 'Organization not found or inactive' });
     }
 
     const { tenant_id } = tenantResult.rows[0];
+    console.log('[tenantLogin] Resolved tenant_id:', tenant_id);
 
     // Step 2 — find user in master users table scoped to tenant
     const userResult = await masterPool.query(
@@ -313,14 +329,20 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
         [tenant_id, username]
     );
 
+    console.log('[tenantLogin] User query result rows:', userResult.rows.length);
+
     const user = userResult.rows[0];
 
     if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    console.log('[tenantLogin] User found, comparing password...');
+
     // Step 3 — validate password
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('[tenantLogin] Password match result:', isMatch);
+    
     if (!isMatch) {
         return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -342,8 +364,8 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
 
     // Store refresh token in database
     await masterPool.query(
-        'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
-        [user.id, refreshToken]
+        'INSERT INTO refresh_tokens (user_id, user_type, token, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'7 days\')',
+        [user.id, 'client', refreshToken]
     );
 
     await masterPool.query(
@@ -357,7 +379,8 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
         user: {
             user_id: user.id,
             tenant_id: user.tenant_id,
-            role: user.role
+            role: user.role,
+            type: 'client'
         }
     });
 }

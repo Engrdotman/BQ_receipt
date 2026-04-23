@@ -6,11 +6,11 @@
     <title>BQ Receipt</title>
     <script>
     (function() {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('bq_token');
 
         let user = {};
         try {
-            user = JSON.parse(localStorage.getItem('user')) || {};
+            user = JSON.parse(localStorage.getItem('bq_user')) || {};
         } catch (e) {
             user = {};
         }

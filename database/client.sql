@@ -1,7 +1,8 @@
 -- Client Database Schema (per tenant)
 -- Each tenant gets their own database with this schema
+-- This database stores: tenant-specific receipts and optionally tenant users (for local auth, separate from master)
 
--- Users table for tenant
+-- Users table for tenant (local users, separate from master_db.users)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -31,3 +32,4 @@ CREATE TABLE IF NOT EXISTS receipts (
 CREATE INDEX IF NOT EXISTS idx_receipts_receipt_id ON receipts(receipt_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_customer_name ON receipts(customer_name);
 CREATE INDEX IF NOT EXISTS idx_receipts_created_at ON receipts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
