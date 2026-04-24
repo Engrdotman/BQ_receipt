@@ -306,83 +306,100 @@ export const resetPassword = async (req, res) => {
 async function tenantLogin(req, res, username, password, tenantSlug) {
     console.log(`[tenantLogin] Attempting login for user: ${username}, tenant: ${tenantSlug}`);
     
-    const masterPool = getMasterPool();
+    try {
+        const masterPool = getMasterPool();
 
-    // Step 1 — resolve tenant
-    const tenantResult = await masterPool.query(
-        'SELECT tenant_id, name, slug, status FROM tenants WHERE slug = $1',
-        [tenantSlug]
-    );
+        // Step 1 — resolve tenant
+        const tenantResult = await masterPool.query(
+            'SELECT id, tenant_id, name, slug, status FROM tenants WHERE slug = $1',
+            [tenantSlug]
+        );
 
-    console.log('[tenantLogin] Tenant query result:', tenantResult.rows);
+        console.log('[tenantLogin] Tenant query result:', tenantResult.rows);
 
-    if (tenantResult.rows.length === 0) {
-        return res.status(401).json({ error: 'Organization not found or inactive' });
-    }
+        if (tenantResult.rows.length === 0) {
+            return res.status(401).json({ error: 'Organization not found or inactive' });
+        }
 
-    const { tenant_id } = tenantResult.rows[0];
-    console.log('[tenantLogin] Resolved tenant_id:', tenant_id);
+        const tenant = tenantResult.rows[0];
+        const tenant_id = tenant.id; // Use 'id' as tenant_id for users table
+        const status = tenant.status;
 
-    // Step 2 — find user in master users table scoped to tenant
-    const userResult = await masterPool.query(
-        'SELECT * FROM users WHERE tenant_id = $1 AND username = $2',
-        [tenant_id, username]
-    );
+        if (status !== 'active') {
+            return res.status(401).json({ error: 'Organization not found or inactive' });
+        }
 
-    console.log('[tenantLogin] User query result rows:', userResult.rows.length);
+        console.log('[tenantLogin] Resolved tenant_id (using id):', tenant_id);
 
-    const user = userResult.rows[0];
+        // Step 2 — find user in master users table scoped to tenant
+        const userResult = await masterPool.query(
+            'SELECT * FROM users WHERE tenant_id = $1 AND username = $2',
+            [tenant_id, username]
+        );
 
-    if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-    }
+        console.log('[tenantLogin] User query result rows:', userResult.rows.length);
 
-    console.log('[tenantLogin] User found, comparing password...');
+        const user = userResult.rows[0];
 
-    // Step 3 — validate password
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log('[tenantLogin] Password match result:', isMatch);
-    
-    if (!isMatch) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-    }
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-    // Step 4 — issue JWT with NO database_url
-    const token = generateToken({
-        user_id: user.id,
-        tenant_id: user.tenant_id,
-        role: user.role,
-        type: 'client'
-    }, '8h');
+        console.log('[tenantLogin] User found, comparing password...');
 
-    const refreshToken = generateRefreshToken({
-        user_id: user.id,
-        username: user.username,
-        role: user.role,
-        tenant_id: user.tenant_id
-    });
+        // Step 3 — validate password
+        const isMatch = await bcrypt.compare(password, user.password);
+        console.log('[tenantLogin] Password match result:', isMatch);
+        
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-    // Store refresh token in database
-    await masterPool.query(
-        'INSERT INTO refresh_tokens (user_id, user_type, token, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'7 days\')',
-        [user.id, 'client', refreshToken]
-    );
-
-    await masterPool.query(
-        'UPDATE users SET last_login = NOW() WHERE id = $1',
-        [user.id]
-    );
-
-    return res.json({
-        token,
-        refreshToken,
-        user: {
+        // Step 4 — issue JWT with NO database_url
+        const token = generateToken({
             user_id: user.id,
             tenant_id: user.tenant_id,
             role: user.role,
             type: 'client'
-        }
-    });
+        }, '8h');
+
+        const refreshToken = generateRefreshToken({
+            user_id: user.id,
+            username: user.username,
+            role: user.role,
+            tenant_id: user.tenant_id
+        });
+
+        console.log('[tenantLogin] Storing refresh token...');
+
+        // Store refresh token in database
+        await masterPool.query(
+            'INSERT INTO refresh_tokens (user_id, user_type, token, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL \'7 days\')',
+            [user.id, 'client', refreshToken]
+        );
+
+        await masterPool.query(
+            'UPDATE users SET last_login = NOW() WHERE id = $1',
+            [user.id]
+        );
+
+        console.log('[tenantLogin] Login successful');
+
+        return res.json({
+            token,
+            refreshToken,
+            user: {
+                user_id: user.id,
+                tenant_id: user.tenant_id,
+                role: user.role,
+                type: 'client'
+            }
+        });
+    } catch (error) {
+        console.error('[tenantLogin] Error:', error.message);
+        console.error('[tenantLogin] Stack:', error.stack);
+        return res.status(500).json({ error: 'Login failed: ' + error.message });
+    }
 }
 
 export default { login, masterLogin, forgotPassword, resetPassword };

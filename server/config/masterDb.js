@@ -19,74 +19,114 @@ export const initializeMasterDatabase = async () => {
     try {
         console.log("=== INITIALIZING MASTER DATABASE ===");
         
-        // Check if tenants table exists
-        const result = await masterPool.query(`
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'tenants'
-            ) as tenants
-        `);
-
-        if (!result.rows[0].tenants) {
-            console.log("⚠️ Master tables not found. Running database/master.sql automatically...");
-            try {
-                // Try to run the SQL setup file
-                const fs = await import('fs');
-                const path = await import('path');
-                const sqlPath = path.join(process.cwd(), 'database', 'master.sql');
-                const sql = fs.readFileSync(sqlPath, 'utf8');
-                // Split by semicolon and execute each statement
-                const statements = sql.split(';').filter(s => s.trim());
-                for (const stmt of statements) {
-                    if (stmt.trim() && !stmt.trim().startsWith('--')) {
-                        try {
-                            await masterPool.query(stmt);
-                        } catch (e) {
-                            // Ignore if object already exists
-                            if (!e.message.includes('already exists')) {
-                                console.warn('SQL stmt warning:', e.message);
-                            }
-                        }
-                    }
-                }
-                console.log("✅ master.sql executed");
-            } catch (e) {
-                console.error("❌ Failed to run master.sql:", e.message);
-                console.log("Please run: psql $MASTER_DATABASE_URL -f database/master.sql");
-            }
-        } else {
-            console.log("✅ Master database tables exist");
+        // Always ensure all tables exist (CREATE TABLE IF NOT EXISTS is idempotent)
+        console.log("Ensuring all master tables exist...");
+        
+        await masterPool.query(`
+            CREATE TABLE IF NOT EXISTS tenants (
+                id SERIAL PRIMARY KEY,
+                tenant_id VARCHAR(50) UNIQUE NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                slug VARCHAR(50) UNIQUE NOT NULL,
+                database_url TEXT NOT NULL,
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             
-            // Ensure users table has all required columns (for existing deployments)
-            try {
-                // Check if users table has password column
-                const colCheck = await masterPool.query(`
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'users' AND column_name = 'password'
-                `);
-                if (colCheck.rows.length === 0) {
-                    console.log("⚠️ users.password column missing, adding it...");
-                    await masterPool.query(`ALTER TABLE users ADD COLUMN password TEXT`);
-                    console.log("✅ Added password column to users");
-                }
-                
-                // Check if users table has tenant_id column
-                const tenantCheck = await masterPool.query(`
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'users' AND column_name = 'tenant_id'
-                `);
-                if (tenantCheck.rows.length === 0) {
-                    console.log("⚠️ users.tenant_id column missing, adding it...");
-                    await masterPool.query(`ALTER TABLE users ADD COLUMN tenant_id VARCHAR(50)`);
-                    // Create index
-                    await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)`);
-                    console.log("✅ Added tenant_id column to users");
-                }
-            } catch (e) {
-                console.warn("⚠️ Could not verify users schema:", e.message);
+            CREATE TABLE IF NOT EXISTS master_users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role VARCHAR(20) DEFAULT 'super_admin',
+                tenant_id VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            );
+            
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                tenant_id VARCHAR(50) NOT NULL,
+                username VARCHAR(50) NOT NULL,
+                password TEXT NOT NULL,
+                role VARCHAR(20) DEFAULT 'admin',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                UNIQUE(tenant_id, username)
+            );
+        `);
+        
+        console.log("✅ Master tables verified/created");
+        
+        // Ensure indexes exist
+        await masterPool.query(`
+            CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
+            CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+            CREATE INDEX IF NOT EXISTS idx_master_users_username ON master_users(username);
+            CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+        `);
+        
+        console.log("✅ Indexes verified/created");
+        
+        // Migrate existing tables if needed (add missing columns)
+        try {
+            // Check and add tenant_id to tenants table
+            const tenantIdCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenants' AND column_name = 'tenant_id'
+            `);
+            if (tenantIdCheck.rows.length === 0) {
+                console.log("⚠️ Adding tenant_id column to tenants table...");
+                await masterPool.query(`ALTER TABLE tenants ADD COLUMN tenant_id VARCHAR(50)`);
+                // Make it UNIQUE after adding
+                await masterPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_tenant_id ON tenants(tenant_id)`);
+                console.log("✅ Added tenant_id column to tenants");
             }
+            
+            // Check and add other missing columns to tenants
+            const nameCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenants' AND column_name = 'name'
+            `);
+            if (nameCheck.rows.length === 0) {
+                await masterPool.query(`ALTER TABLE tenants ADD COLUMN name VARCHAR(100)`);
+                await masterPool.query(`UPDATE tenants SET name = COALESCE(slug, 'Unknown') WHERE name IS NULL`);
+            }
+            
+            const slugCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenants' AND column_name = 'slug'
+            `);
+            if (slugCheck.rows.length === 0) {
+                await masterPool.query(`ALTER TABLE tenants ADD COLUMN slug VARCHAR(50)`);
+                await masterPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_slug_unique ON tenants(slug)`);
+            }
+            
+            const dbUrlCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenants' AND column_name = 'database_url'
+            `);
+            if (dbUrlCheck.rows.length === 0) {
+                await masterPool.query(`ALTER TABLE tenants ADD COLUMN database_url TEXT`);
+            }
+            
+            const statusCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenants' AND column_name = 'status'
+            `);
+            if (statusCheck.rows.length === 0) {
+                await masterPool.query(`ALTER TABLE tenants ADD COLUMN status VARCHAR(20) DEFAULT 'active'`);
+            }
+            
+            console.log("✅ Tenants table migration complete");
+        } catch (migrateErr) {
+            console.warn("⚠️ Migration warning:", migrateErr.message);
         }
 
         // Ensure refresh_tokens and password_resets tables
@@ -113,7 +153,100 @@ export const initializeMasterDatabase = async () => {
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked ON refresh_tokens(revoked);
             CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
         `);
+        
+        // Drop problematic foreign key constraint if it exists
+        try {
+            await masterPool.query(`
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'refresh_tokens_user_id_fkey'
+                        AND table_name = 'refresh_tokens'
+                    ) THEN
+                        ALTER TABLE refresh_tokens DROP CONSTRAINT refresh_tokens_user_id_fkey;
+                        RAISE NOTICE 'Dropped foreign key constraint refresh_tokens_user_id_fkey';
+                    END IF;
+                END
+                $$;
+            `);
+        } catch (fkErr) {
+            console.log("ℹ️ Foreign key check/update:", fkErr.message);
+        }
+        
+        // Migrate refresh_tokens table if user_type column is missing
+        try {
+            const userTypeCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'refresh_tokens' AND column_name = 'user_type'
+            `);
+            if (userTypeCheck.rows.length === 0) {
+                console.log("⚠️ Adding user_type column to refresh_tokens table...");
+                await masterPool.query(`ALTER TABLE refresh_tokens ADD COLUMN user_type VARCHAR(20) DEFAULT 'client'`);
+                console.log("✅ Added user_type column to refresh_tokens");
+            }
+        } catch (migrateErr) {
+            console.warn("⚠️ refresh_tokens migration warning:", migrateErr.message);
+        }
 
+        // Insert default data if missing
+        console.log("Checking default data...");
+        
+        // Default master user
+        await masterPool.query(`
+            INSERT INTO master_users (username, password, role)
+            VALUES ('master', '$2b$10$uNFcvJCvsbLhIObiUbwR9OvOFOWlZNRnkZHgBNYgcvAvwOYJOIhS6', 'super_admin')
+            ON CONFLICT (username) DO NOTHING
+        `);
+        
+        // Default tenant (bq_receipt) - insert without tenant_id to avoid type issues
+        await masterPool.query(`
+            INSERT INTO tenants (name, slug, database_url, status)
+            VALUES ('BQ Receipt', 'bq_receipt', $1, 'active')
+            ON CONFLICT (slug) DO NOTHING
+        `, [process.env.DATABASE_URL || 'postgresql://localhost/bq_receiptdb']);
+        
+        // Get the tenant id for the user insertion (use 'id' since users.tenant_id is INTEGER)
+        const tenantResult = await masterPool.query(`SELECT id, tenant_id FROM tenants WHERE slug = 'bq_receipt'`);
+        const tenantRow = tenantResult.rows[0];
+        
+        console.log(`ℹ️ Found tenant: id=${tenantRow?.id}, tenant_id=${tenantRow?.tenant_id}`);
+        
+        if (tenantRow?.id) {
+            const tenantIdForUser = tenantRow.id; // Use INTEGER id, not VARCHAR tenant_id
+            
+            // Check if user exists
+            const existingUser = await masterPool.query(
+                `SELECT id, tenant_id FROM users WHERE username = 'admin'`
+            );
+            
+            if (existingUser.rows.length > 0) {
+                console.log(`ℹ️ Updating user 'admin' with tenant_id=${tenantIdForUser}`);
+                // Update existing user's tenant_id and password
+                await masterPool.query(`
+                    UPDATE users 
+                    SET tenant_id = $1, password = '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe'
+                    WHERE username = 'admin'
+                `, [tenantIdForUser]);
+                console.log(`✅ Updated user 'admin' with tenant_id=${tenantIdForUser}`);
+            } else {
+                // Insert new user
+                console.log(`ℹ️ Inserting user 'admin' with tenant_id=${tenantIdForUser}`);
+                try {
+                    await masterPool.query(`
+                        INSERT INTO users (tenant_id, username, password, role)
+                        VALUES ($1, 'admin', '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe', 'admin')
+                    `, [tenantIdForUser]);
+                    console.log(`✅ Inserted user 'admin' with tenant_id=${tenantIdForUser}`);
+                } catch (err) {
+                    console.warn("⚠️ Could not insert user:", err.message);
+                }
+            }
+        } else {
+            console.log("ℹ️ Could not find tenant for bq_receipt");
+        }
+        
         console.log("✅ Master database initialized");
         
         // Print summary

@@ -57,7 +57,7 @@ export const tenantMiddleware = async (req, res, next) => {
         const masterPool = getMasterPool();
 
         const tenantResult = await masterPool.query(
-            'SELECT database_url FROM tenants WHERE tenant_id = $1 AND status = $2',
+            'SELECT database_url FROM tenants WHERE id = $1 AND status = $2',
             [tenant_id, 'active']
         );
 

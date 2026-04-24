@@ -24,8 +24,8 @@ const getApiUrl = () => {
         return savedUrl;
     }
     
-    // 3. Return production default
-    return 'https://bqreceipt-production.up.railway.app/api';
+    // 3. Return localhost default for development
+    return 'http://localhost:5000/api';
 };
 
 const setApiUrl = (url) => localStorage.setItem('api_url', url);
