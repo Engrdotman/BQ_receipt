@@ -412,6 +412,13 @@ const initDB = async () => {
         await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
         await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP");
         
+        // Handle password_hash column if it exists (make it nullable or populate it)
+        try {
+            await pool.query("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL");
+        } catch (e) {
+            // password_hash column doesn't exist, that's fine
+        }
+        
         // Create admin if no users exist
         const userCount = await pool.query("SELECT COUNT(*) FROM users");
         if (parseInt(userCount.rows[0].count) === 0) {

@@ -154,6 +154,22 @@ export const initializeMasterDatabase = async () => {
             CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
         `);
         
+        // Migrate refresh_tokens table if revoked column is missing
+        try {
+            const revokedCheck = await masterPool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'refresh_tokens' AND column_name = 'revoked'
+            `);
+            if (revokedCheck.rows.length === 0) {
+                console.log("⚠️ Adding revoked column to refresh_tokens table...");
+                await masterPool.query(`ALTER TABLE refresh_tokens ADD COLUMN revoked BOOLEAN DEFAULT FALSE`);
+                console.log("✅ Added revoked column to refresh_tokens");
+            }
+        } catch (migrateErr) {
+            console.warn("⚠️ refresh_tokens revoked column migration warning:", migrateErr.message);
+        }
+        
         // Drop problematic foreign key constraint if it exists
         try {
             await masterPool.query(`
@@ -188,6 +204,40 @@ export const initializeMasterDatabase = async () => {
             }
         } catch (migrateErr) {
             console.warn("⚠️ refresh_tokens migration warning:", migrateErr.message);
+        }
+        
+        // Fix users table tenant_id NOT NULL constraint violation
+        try {
+            // Check if there are users with NULL tenant_id
+            const nullTenantCheck = await masterPool.query(
+                'SELECT COUNT(*) as count FROM users WHERE tenant_id IS NULL'
+            );
+            
+            if (parseInt(nullTenantCheck.rows[0].count) > 0) {
+                console.log(`⚠️ Found ${nullTenantCheck.rows[0].count} users with NULL tenant_id, fixing...`);
+                
+                // First, make sure we have a tenant to assign them to
+                const tenantResult = await masterPool.query(
+                    'SELECT id FROM tenants WHERE slug = $1 LIMIT 1',
+                    ['bq_receipt']
+                );
+                
+                if (tenantResult.rows.length > 0) {
+                    const tenantId = tenantResult.rows[0].id;
+                    console.log(`ℹ️ Assigning NULL tenant_id users to tenant_id=${tenantId}`);
+                    
+                    // Update NULL tenant_id values to point to bq_receipt tenant
+                    await masterPool.query(
+                        'UPDATE users SET tenant_id = $1 WHERE tenant_id IS NULL',
+                        [tenantId]
+                    );
+                    console.log("✅ Fixed NULL tenant_id values in users table");
+                } else {
+                    console.warn("⚠️ No bq_receipt tenant found to assign NULL tenant_id users");
+                }
+            }
+        } catch (nullErr) {
+            console.warn("⚠️ NULL tenant_id migration warning:", nullErr.message);
         }
 
         // Insert default data if missing
