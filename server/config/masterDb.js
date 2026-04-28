@@ -266,32 +266,32 @@ export const initializeMasterDatabase = async () => {
         if (tenantRow?.id) {
             const tenantIdForUser = tenantRow.id; // Use INTEGER id, not VARCHAR tenant_id
             
-            // Check if user exists
-            const existingUser = await masterPool.query(
-                `SELECT id, tenant_id FROM users WHERE username = 'admin'`
-            );
-            
-            if (existingUser.rows.length > 0) {
-                console.log(`ℹ️ Updating user 'admin' with tenant_id=${tenantIdForUser}`);
-                // Update existing user's tenant_id and password
-                await masterPool.query(`
-                    UPDATE users 
-                    SET tenant_id = $1, password = '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe'
-                    WHERE username = 'admin'
-                `, [tenantIdForUser]);
-                console.log(`✅ Updated user 'admin' with tenant_id=${tenantIdForUser}`);
-            } else {
-                // Insert new user
-                console.log(`ℹ️ Inserting user 'admin' with tenant_id=${tenantIdForUser}`);
-                try {
+            try {
+                // Check if user exists
+                const existingUser = await masterPool.query(
+                    `SELECT id, tenant_id FROM users WHERE username = 'admin'`
+                );
+                
+                if (existingUser.rows.length > 0) {
+                    console.log(`ℹ️ Updating user 'admin' with tenant_id=${tenantIdForUser}`);
+                    // Update existing user's tenant_id and password
+                    await masterPool.query(`
+                        UPDATE users 
+                        SET tenant_id = $1, password = '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe'
+                        WHERE username = 'admin'
+                    `, [tenantIdForUser]);
+                    console.log(`✅ Updated user 'admin' with tenant_id=${tenantIdForUser}`);
+                } else {
+                    // Insert new user
+                    console.log(`ℹ️ Inserting user 'admin' with tenant_id=${tenantIdForUser}`);
                     await masterPool.query(`
                         INSERT INTO users (tenant_id, username, password, role)
                         VALUES ($1, 'admin', '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe', 'admin')
                     `, [tenantIdForUser]);
                     console.log(`✅ Inserted user 'admin' with tenant_id=${tenantIdForUser}`);
-                } catch (err) {
-                    console.warn("⚠️ Could not insert user:", err.message);
                 }
+            } catch (userErr) {
+                console.error(`❌ Failed to insert/update user 'admin': ${userErr.message}`, userErr);
             }
         } else {
             console.log("ℹ️ Could not find tenant for bq_receipt");
@@ -300,13 +300,10 @@ export const initializeMasterDatabase = async () => {
         console.log("✅ Master database initialized");
         
         // Print summary
-        const summary = await masterPool.query(`
-            SELECT 
-                (SELECT COUNT(*) FROM tenants) as tenant_count,
-                (SELECT COUNT(*) FROM users) as user_count,
-                (SELECT COUNT(*) FROM master_users) as master_count
-        `);
-        console.log(`📊 DB stats: tenants=${summary.rows[0].tenant_count}, users=${summary.rows[0].user_count}, master_users=${summary.rows[0].master_count}`);
+        const tenantCount = await masterPool.query('SELECT COUNT(*) as count FROM tenants');
+        const userCount = await masterPool.query('SELECT COUNT(*) as count FROM users');
+        const masterCount = await masterPool.query('SELECT COUNT(*) as count FROM master_users');
+        console.log(`📊 DB stats: tenants=${tenantCount.rows[0].count}, users=${userCount.rows[0].count}, master_users=${masterCount.rows[0].count}`);
         
     } catch (error) {
         console.error("❌ Master DB init error:", error.message);
