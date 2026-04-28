@@ -300,12 +300,7 @@ export const resetPassword = async (req, res) => {
 //  INTERNAL: Tenant Login helper
 //  1. Find tenant by slug in master_db.tenants
 //  2. Find user by tenant_id in master_db.users
-//  3. Validate password
-//  4. Issue JWT with user_id, tenant_id, role ONLY
-// ─────────────────────────────────────────────
 async function tenantLogin(req, res, username, password, tenantSlug) {
-    console.log(`[tenantLogin] Attempting login for user: ${username}, tenant: ${tenantSlug}`);
-    
     try {
         const masterPool = getMasterPool();
 
@@ -322,14 +317,14 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
         }
 
         const tenant = tenantResult.rows[0];
-        const tenant_id = tenant.id; // Use 'id' as tenant_id for users table
+        const tenant_id = tenant.tenant_id; // Use 'tenant_id' string for users table
         const status = tenant.status;
 
         if (status !== 'active') {
             return res.status(401).json({ error: 'Organization not found or inactive' });
         }
 
-        console.log('[tenantLogin] Resolved tenant_id (using id):', tenant_id);
+        console.log('[tenantLogin] Resolved tenant_id (using tenant_id string):', tenant_id);
 
         // Step 2 — find user in master users table scoped to tenant
         const userResult = await masterPool.query(

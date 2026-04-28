@@ -9,8 +9,10 @@ if (!process.env.MASTER_DATABASE_URL) {
     throw new Error("❌ MASTER_DATABASE_URL is not set");
 }
 
+console.log("Connecting to Master DB:", process.env.MASTER_DATABASE_URL ? process.env.MASTER_DATABASE_URL.replace(/:[^:@]+@/, ':***@') : "UNDEFINED");
 const masterPool = new Pool({
-    connectionString: process.env.MASTER_DATABASE_URL
+    connectionString: process.env.MASTER_DATABASE_URL,
+    ssl: false
 });
 
 export const getMasterPool = () => masterPool;
@@ -32,8 +34,10 @@ export const initializeMasterDatabase = async () => {
                 status VARCHAR(20) DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            
+            )
+        `);
+        
+        await masterPool.query(`
             CREATE TABLE IF NOT EXISTS master_users (
                 id SERIAL PRIMARY KEY,
                 username VARCHAR(50) UNIQUE NOT NULL,
@@ -42,8 +46,10 @@ export const initializeMasterDatabase = async () => {
                 tenant_id VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP
-            );
-            
+            )
+        `);
+        
+        await masterPool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 tenant_id VARCHAR(50) NOT NULL,
@@ -53,19 +59,17 @@ export const initializeMasterDatabase = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP,
                 UNIQUE(tenant_id, username)
-            );
+            )
         `);
         
         console.log("✅ Master tables verified/created");
         
         // Ensure indexes exist
-        await masterPool.query(`
-            CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
-            CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
-            CREATE INDEX IF NOT EXISTS idx_master_users_username ON master_users(username);
-            CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
-            CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-        `);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_master_users_username ON master_users(username)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
         
         console.log("✅ Indexes verified/created");
         
@@ -139,20 +143,49 @@ export const initializeMasterDatabase = async () => {
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 revoked BOOLEAN DEFAULT FALSE
-            );
+            )
+        `);
+        await masterPool.query(`
             CREATE TABLE IF NOT EXISTS password_resets (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 token TEXT NOT NULL,
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expiry ON refresh_tokens(expires_at);
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked ON refresh_tokens(revoked);
-            CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+            )
         `);
+        // Migrate existing tables to ensure they have user_id
+        try {
+            const refreshUserIdCheck = await masterPool.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'refresh_tokens' AND column_name = 'user_id'
+            `);
+            if (refreshUserIdCheck.rows.length === 0) {
+                console.log("⚠️ Adding user_id column to refresh_tokens table...");
+                await masterPool.query(`ALTER TABLE refresh_tokens ADD COLUMN user_id INTEGER`);
+            }
+        } catch (e) {
+            console.warn("⚠️ refresh_tokens user_id migration warning:", e.message);
+        }
+
+        try {
+            const resetUserIdCheck = await masterPool.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'password_resets' AND column_name = 'user_id'
+            `);
+            if (resetUserIdCheck.rows.length === 0) {
+                console.log("⚠️ Adding user_id column to password_resets table...");
+                await masterPool.query(`ALTER TABLE password_resets ADD COLUMN user_id INTEGER`);
+            }
+        } catch (e) {
+            console.warn("⚠️ password_resets user_id migration warning:", e.message);
+        }
+
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expiry ON refresh_tokens(expires_at)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked ON refresh_tokens(revoked)`);
+        await masterPool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id)`);
         
         // Migrate refresh_tokens table if revoked column is missing
         try {
@@ -251,20 +284,24 @@ export const initializeMasterDatabase = async () => {
         `);
         
         // Default tenant (bq_receipt) - insert without tenant_id to avoid type issues
+        const databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost/bq_receiptdb';
+        if (!databaseUrl) {
+            console.warn("⚠️ DATABASE_URL is not set, using fallback for tenant insertion");
+        }
         await masterPool.query(`
-            INSERT INTO tenants (name, slug, database_url, status)
-            VALUES ('BQ Receipt', 'bq_receipt', $1, 'active')
+            INSERT INTO tenants (tenant_id, name, slug, database_url, status)
+            VALUES ('tenant_bq', 'BQ Receipt', 'bq_receipt', $1, 'active')
             ON CONFLICT (slug) DO NOTHING
-        `, [process.env.DATABASE_URL || 'postgresql://localhost/bq_receiptdb']);
+        `, [databaseUrl]);
         
-        // Get the tenant id for the user insertion (use 'id' since users.tenant_id is INTEGER)
+        // Get the tenant id for the user insertion (use VARCHAR tenant_id)
         const tenantResult = await masterPool.query(`SELECT id, tenant_id FROM tenants WHERE slug = 'bq_receipt'`);
         const tenantRow = tenantResult.rows[0];
         
         console.log(`ℹ️ Found tenant: id=${tenantRow?.id}, tenant_id=${tenantRow?.tenant_id}`);
         
-        if (tenantRow?.id) {
-            const tenantIdForUser = tenantRow.id; // Use INTEGER id, not VARCHAR tenant_id
+        if (tenantRow?.tenant_id) {
+            const tenantIdForUser = tenantRow.tenant_id; // Use VARCHAR tenant_id
             
             // Check if user exists
             const existingUser = await masterPool.query(

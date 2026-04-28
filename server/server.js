@@ -60,8 +60,10 @@ app.get("/seed", async (req, res) => {
         status VARCHAR(20) DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
+      )
+    `);
+    
+    await masterPool.query(`
       CREATE TABLE IF NOT EXISTS master_users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,
@@ -70,8 +72,10 @@ app.get("/seed", async (req, res) => {
         tenant_id VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP
-      );
-      
+      )
+    `);
+    
+    await masterPool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         tenant_id VARCHAR(50) NOT NULL,
@@ -81,16 +85,20 @@ app.get("/seed", async (req, res) => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP,
         UNIQUE(tenant_id, username)
-      );
-      
+      )
+    `);
+
+    await masterPool.query(`
       CREATE TABLE IF NOT EXISTS password_resets (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         token TEXT NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
+      )
+    `);
+    
+    await masterPool.query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
@@ -99,8 +107,9 @@ app.get("/seed", async (req, res) => {
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         revoked BOOLEAN DEFAULT FALSE
-      );
+      )
     `);
+
     console.log("✅ Tables created/verified");
     
     // Fix: Add tenant_id column if it doesn't exist (migration for old schema)
@@ -196,24 +205,24 @@ app.get("/test-db", async (req, res) => {
     console.log("=== CLIENT DB TEST ===");
     
     // Fix tables automatically
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_email TEXT");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_name TEXT");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_address TEXT");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_phone TEXT");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS payment_method TEXT");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS imei_number TEXT");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS items JSONB");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS total_amount DECIMAL");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS receipt_id VARCHAR(50) UNIQUE");
+    await pool.query("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+    
     await pool.query(`
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_email TEXT;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_name TEXT;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_address TEXT;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_phone TEXT;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS payment_method TEXT;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS imei_number TEXT;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS items JSONB;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS total_amount DECIMAL;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS receipt_id VARCHAR(50) UNIQUE;
-        ALTER TABLE receipts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-        
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
             password TEXT NOT NULL,
             role VARCHAR(20) DEFAULT 'admin'
-        );
+        )
     `);
 
     // Show current users
@@ -353,15 +362,9 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong!' });
 });
 
-const PORT = process.env.PORT || 5000;
-
 const initDB = async () => {
     try {
         console.log("=== INITIALIZING CLIENT DATABASE ===");
-        
-        if (!process.env.DATABASE_URL) {
-            console.warn("⚠️ DATABASE_URL not set in .env - using default local PostgreSQL");
-        }
         
         // Ensure receipts table structure
         await pool.query(`
@@ -378,7 +381,7 @@ const initDB = async () => {
                 total_amount DECIMAL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
         `);
         
         // Receipts columns
@@ -403,7 +406,7 @@ const initDB = async () => {
                 role VARCHAR(20) DEFAULT 'admin',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP
-            );
+            )
         `);
         
         // Add missing columns to users if table already existed
@@ -424,8 +427,24 @@ const initDB = async () => {
         if (parseInt(userCount.rows[0].count) === 0) {
             const passwordToUse = process.env.DEFAULT_CLIENT_PASSWORD || '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe';
             const usernameToUse = process.env.DEFAULT_CLIENT_USERNAME || 'admin';
-            await pool.query("INSERT INTO users (username, password, role) VALUES ($1, $2, $3)", [usernameToUse, passwordToUse, "admin"]);
-            console.log(`✅ Default admin user created (${usernameToUse} / admin2026)`);
+            
+            // Fix: Check if tenant_id column exists to handle shared DB environments (like Railway)
+            try {
+                const hasTenantId = await pool.query(`
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'users' AND column_name = 'tenant_id'
+                `);
+                
+                if (hasTenantId.rows.length > 0) {
+                    await pool.query("INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4)", ['tenant_bq', usernameToUse, passwordToUse, "admin"]);
+                    console.log(`✅ Default admin user created (${usernameToUse} / admin2026) with tenant_id='tenant_bq'`);
+                } else {
+                    await pool.query("INSERT INTO users (username, password, role) VALUES ($1, $2, $3)", [usernameToUse, passwordToUse, "admin"]);
+                    console.log(`✅ Default admin user created (${usernameToUse} / admin2026) without tenant_id`);
+                }
+            } catch (insertErr) {
+                console.error("⚠️ Failed to insert default admin user:", insertErr.message);
+            }
         } else {
             console.log("ℹ️ Users already exist in client database");
         }
@@ -478,4 +497,3 @@ const startServer = async () => {
 };
 
 startServer();
-
