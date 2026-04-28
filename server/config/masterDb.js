@@ -46,7 +46,7 @@ export const initializeMasterDatabase = async () => {
             
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
-                tenant_id VARCHAR(50) NOT NULL,
+                tenant_id INTEGER NOT NULL,
                 username VARCHAR(50) NOT NULL,
                 password TEXT NOT NULL,
                 role VARCHAR(20) DEFAULT 'admin',
