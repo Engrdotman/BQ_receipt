@@ -207,14 +207,13 @@ export const forgotPassword = async (req, res) => {
         const masterPool = getMasterPool();
 
         let tenantId = null;
-        if (tenant) {
-            const tenantResult = await masterPool.query(
-                'SELECT tenant_id FROM tenants WHERE slug = $1 AND status = $2',
-                [tenant, 'active']
-            );
-            if (tenantResult.rows.length > 0) {
-                tenantId = tenantResult.rows[0].tenant_id;
-            }
+        // Get tenant integer ID for users.tenant_id (INTEGER column)
+        const tenantResult = await masterPool.query(
+            'SELECT id FROM tenants WHERE slug = $1 AND status = $2',
+            [tenant, 'active']
+        );
+        if (tenantResult.rows.length > 0) {
+            tenantId = tenantResult.rows[0].id;  // Use integer id, not VARCHAR tenant_id
         }
 
         let query = 'SELECT id FROM users WHERE username = $1';
@@ -317,7 +316,7 @@ async function tenantLogin(req, res, username, password, tenantSlug) {
         }
 
         const tenant = tenantResult.rows[0];
-        const tenant_id = tenant.tenant_id; // Use 'tenant_id' string for users table
+        const tenant_id = tenant.id;  // Use integer id for users.tenant_id
         const status = tenant.status;
 
         if (status !== 'active') {

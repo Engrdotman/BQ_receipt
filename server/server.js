@@ -161,18 +161,25 @@ app.get("/seed", async (req, res) => {
     `, ['tenant_bq', 'BQ Receipt', 'bq_receipt', process.env.DATABASE_URL, 'active']);
     console.log("✅ Tenant seeded (active)");
     
+    // Fetch the integer ID of the tenant (used for users.tenant_id which is INTEGER)
+    const tenantResult = await masterPool.query("SELECT id FROM tenants WHERE slug = 'bq_receipt'");
+    if (tenantResult.rows.length === 0) {
+        throw new Error("Tenant 'bq_receipt' not found after seeding");
+    }
+    const tenantId = tenantResult.rows[0].id;
+    
     // 3. Create/update client user (this is the one you login with!)
     console.log("Seeding client user (admin) in master DB...");
     await masterPool.query(`
       INSERT INTO users (tenant_id, username, password, role) 
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (tenant_id, username) DO UPDATE SET password = $3
-    `, ['tenant_bq', process.env.DEFAULT_CLIENT_USERNAME || 'admin', process.env.DEFAULT_CLIENT_PASSWORD, 'admin']);
+    `, [tenantId, process.env.DEFAULT_CLIENT_USERNAME || 'admin', process.env.DEFAULT_CLIENT_PASSWORD, 'admin']);
     console.log("✅ Client user seeded in master DB");
     
     // Verify everything
     const tenantCheck = await masterPool.query("SELECT * FROM tenants WHERE slug = 'bq_receipt'");
-    const userCheck = await masterPool.query("SELECT id, username, role, tenant_id FROM users WHERE tenant_id = 'tenant_bq' AND username = $1", [process.env.DEFAULT_CLIENT_USERNAME || 'admin']);
+    const userCheck = await masterPool.query("SELECT id, username, role, tenant_id FROM users WHERE tenant_id = $1 AND username = $2", [tenantId, process.env.DEFAULT_CLIENT_USERNAME || 'admin']);
     const masterCheck = await masterPool.query("SELECT username, role FROM master_users WHERE username = $1", [process.env.MASTER_USERNAME || 'master']);
     
     res.send(`
@@ -274,10 +281,10 @@ app.get("/debug-login", async (req, res) => {
       [tenant || 'bq_receipt']
     );
     
-    // Check users in that tenant
+    // Check users in that tenant (users.tenant_id is integer referencing tenants.id)
     const userResult = await masterPool.query(
       'SELECT id, username, role, tenant_id, LEFT(password, 30) as pwd_hash FROM users WHERE tenant_id = $1',
-      [tenantResult.rows[0]?.tenant_id]
+      [tenantResult.rows[0]?.id]  // Use integer id, not VARCHAR tenant_id
     );
     
     // Check all tenants for reference
@@ -319,7 +326,7 @@ app.get("/master-users", async (req, res) => {
       SELECT u.id, u.username, u.role, u.tenant_id, t.slug as tenant_slug, 
              LEFT(u.password, 30) as pwd_hash 
       FROM users u
-      LEFT JOIN tenants t ON u.tenant_id = t.tenant_id
+      LEFT JOIN tenants t ON u.tenant_id = t.id  -- Join on integer id
     `);
     const tenants = await masterPool.query("SELECT * FROM tenants");
     res.json({ master_users: result.rows, tenants: tenants.rows });
@@ -336,16 +343,23 @@ app.get("/reset-admin", async (req, res) => {
     
     const masterPool = getMasterPool();
     
+    // Get tenant integer ID for bq_receipt
+    const tenantResult = await masterPool.query("SELECT id FROM tenants WHERE slug = 'bq_receipt'");
+    if (tenantResult.rows.length === 0) {
+        return res.status(500).json({ error: "Tenant 'bq_receipt' not found" });
+    }
+    const tenantId = tenantResult.rows[0].id;
+    
     // Reset admin password in MASTER database users table (this is what auth uses!)
     await masterPool.query(`
       INSERT INTO users (username, password, role, tenant_id) 
-      VALUES ('admin', $1, 'admin', 'tenant_bq')
+      VALUES ('admin', $1, 'admin', $2)
       ON CONFLICT (tenant_id, username) DO UPDATE SET password = $1
-    `, [process.env.DEFAULT_CLIENT_PASSWORD]);
+    `, [process.env.DEFAULT_CLIENT_PASSWORD, tenantId]);
     
     res.json({ 
       message: "Admin password reset in MASTER database. Login with: bq_receipt / admin / admin2026",
-      tip: "The admin user is in master_db.users table with tenant_id='tenant_bq'"
+      tip: "The admin user is in master_db.users table with tenant_id=<integer id of bq_receipt>"
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -300,8 +300,8 @@ export const initializeMasterDatabase = async () => {
         
         console.log(`ℹ️ Found tenant: id=${tenantRow?.id}, tenant_id=${tenantRow?.tenant_id}`);
         
-        if (tenantRow?.tenant_id) {
-            const tenantIdForUser = tenantRow.tenant_id; // Use VARCHAR tenant_id
+        if (tenantRow?.id) {
+            const tenantIdForUser = tenantRow.id; // Use integer id for users.tenant_id
             
             try {
                 // Check if user exists

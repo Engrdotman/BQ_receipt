@@ -66,26 +66,33 @@ router.post('/seed', async (req, res) => {
             console.log('✅ Master user created');
         }
         
-        // Check if bq_receipt tenant exists
-        const tenantCheck = await pool.query("SELECT * FROM tenants WHERE slug = 'bq_receipt'");
-        if (tenantCheck.rows.length === 0) {
-            const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/bq_receiptdb';
-            await pool.query(
-                'INSERT INTO tenants (tenant_id, name, slug, database_url, status) VALUES ($1, $2, $3, $4, $5)',
-                ['tenant_bq', 'BQ Receipt', 'bq_receipt', dbUrl, 'active']
-            );
-            console.log('✅ BQ Receipt tenant created');
-        }
-        
-        // Check if client user exists
-        const clientCheck = await pool.query("SELECT * FROM users WHERE tenant_id = $1 AND username = $2", ['tenant_bq', process.env.DEFAULT_CLIENT_USERNAME || 'admin']);
-        if (clientCheck.rows.length === 0) {
-            await pool.query(
-                'INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4)',
-                ['tenant_bq', process.env.DEFAULT_CLIENT_USERNAME || 'admin', process.env.DEFAULT_CLIENT_PASSWORD, 'admin']
-            );
-            console.log('✅ Client user created');
-        }
+         // Check if bq_receipt tenant exists
+         const tenantCheck = await pool.query("SELECT * FROM tenants WHERE slug = 'bq_receipt'");
+         if (tenantCheck.rows.length === 0) {
+             const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/bq_receiptdb';
+             await pool.query(
+                 'INSERT INTO tenants (tenant_id, name, slug, database_url, status) VALUES ($1, $2, $3, $4, $5)',
+                 ['tenant_bq', 'BQ Receipt', 'bq_receipt', dbUrl, 'active']
+             );
+             console.log('✅ BQ Receipt tenant created');
+         }
+         
+         // Get the integer ID of the tenant (users.tenant_id is INTEGER)
+         const tenantResult = await pool.query("SELECT id FROM tenants WHERE slug = 'bq_receipt'");
+         if (tenantResult.rows.length === 0) {
+             return res.status(500).json({ error: 'Tenant not found' });
+         }
+         const tenantId = tenantResult.rows[0].id;
+         
+         // Check if client user exists
+         const clientCheck = await pool.query("SELECT * FROM users WHERE tenant_id = $1 AND username = $2", [tenantId, process.env.DEFAULT_CLIENT_USERNAME || 'admin']);
+         if (clientCheck.rows.length === 0) {
+             await pool.query(
+                 'INSERT INTO users (tenant_id, username, password, role) VALUES ($1, $2, $3, $4)',
+                 [tenantId, process.env.DEFAULT_CLIENT_USERNAME || 'admin', process.env.DEFAULT_CLIENT_PASSWORD, 'admin']
+             );
+             console.log('✅ Client user created');
+         }
         
         res.json({ message: 'Seed completed' });
     } catch (error) {
