@@ -13,7 +13,7 @@ const ENV = {
 };
 
 const getApiUrl = () => {
-    // 1. Check environment variable first
+    // 1. Check environment variable first (Vite exposes this)
     if (import.meta.env?.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
@@ -24,7 +24,17 @@ const getApiUrl = () => {
         return savedUrl;
     }
     
-    // 3. Return production URL as default (localStorage can override for local dev)
+    // 3. Auto-detect local environment
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    // If running from file:// (local HTML file opened directly) or localhost
+    if (protocol === 'file:' || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+        // Try to use the server on localhost:5000 (default server port)
+        return 'http://localhost:5000/api';
+    }
+    
+    // 4. Default to production Railway URL
     return 'https://bqreceipt-production.up.railway.app/api';
 };
 
