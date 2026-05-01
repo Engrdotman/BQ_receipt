@@ -25,6 +25,7 @@
         @media (max-width: 768px) {
             .nav {
                 flex-direction: column;
+                justify-content: center;
                 gap: 1rem;
                 text-align: center;
             }
@@ -107,6 +108,12 @@
             h1 {
                 font-size: 1.5rem;
             }
+        }
+
+        /* Center the main content card */
+        .tab-content .form-card {
+            max-width: 900px;
+            margin: 2rem auto;
         }
     </style>
 </head>
@@ -287,7 +294,7 @@
                     <td>${new Date(r.created_at).toLocaleDateString()}</td>
                     <td style="font-weight: 500;">${r.customer_name}</td>
                     <td style="color: var(--text-secondary);">${r.customer_email || 'N/A'}</td>
-                    <td style="color: var(--accent-color); font-weight: 600;">$${parseFloat(r.total_amount).toFixed(2)}</td>
+                    <td style="color: var(--accent-color); font-weight: 600;">#${parseFloat(r.total_amount).toFixed(2)}</td>
                     <td>
                         <div class="action-btns">
                             <button class="btn-download" data-id="${r.id}">Download</button>
