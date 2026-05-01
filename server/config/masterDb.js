@@ -303,7 +303,7 @@ export const initializeMasterDatabase = async () => {
                     // Update existing user's tenant_id and password
                     await masterPool.query(`
                         UPDATE users 
-                        SET tenant_id = $1, password = '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe'
+                        SET tenant_id = $1, email = 'admin@bq-receipt.local', password = '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe'
                         WHERE username = 'admin'
                     `, [tenantIdForUser]);
                     console.log(`✅ Updated user 'admin' with tenant_id=${tenantIdForUser}`);
@@ -311,8 +311,8 @@ export const initializeMasterDatabase = async () => {
                     // Insert new user
                     console.log(`ℹ️ Inserting user 'admin' with tenant_id=${tenantIdForUser}`);
                     await masterPool.query(`
-                        INSERT INTO users (tenant_id, username, password, role)
-                        VALUES ($1, 'admin', '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe', 'admin')
+                        INSERT INTO users (tenant_id, username, email, password, role)
+                        VALUES ($1, 'admin', 'admin@bq-receipt.local', '$2b$10$DNaC8VZtgnLtlbjQWjVxw.51gFQZXhZIHaoCy45i7NdVOEtpVIvNe', 'admin')
                     `, [tenantIdForUser]);
                     console.log(`✅ Inserted user 'admin' with tenant_id=${tenantIdForUser}`);
                 }
