@@ -209,7 +209,7 @@
                     <td>${new Date(r.created_at).toLocaleDateString()}</td>
                     <td style="font-weight: 500;">${r.customer_name}</td>
                     <td style="color: var(--text-secondary);">${r.customer_email || 'N/A'}</td>
-                    <td style="color: var(--accent-color); font-weight: 600;">$${parseFloat(r.total_amount).toFixed(2)}</td>
+                    <td style="color: var(--accent-color); font-weight: 600;">#${parseFloat(r.total_amount).toFixed(2)}</td>
                     <td><span style="padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.1); color: var(--success);">Paid</span></td>
                     <td>
                         <div class="action-btns">

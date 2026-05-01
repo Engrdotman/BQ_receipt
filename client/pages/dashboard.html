@@ -23,39 +23,7 @@
 
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
-            .nav {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;  
-                flex-direction: row;
-                align-items: center;
-                justify-content: space-between;
-                padding: 0;
-                margin: 0 1rem;
-            }
-            .logo-container {
-                display: flex;
-                align-items: center;
-                gap: 0.3rem;
 
-                img{
-                    height: 55px;
-                    width: 55px;
-                    border-radius: 10%;
-                }
-                
-            }
-            .nav-links {
-                display: flex;
-                gap: 0.5rem;
-                align-items: center;
-            }
-            .nav-links a {
-                padding: 0.4rem 0.8rem;
-                font-size: 0.9rem;
-            }
-            .nav-actions {
-                font-size: 0.9rem;
-            }
             /* Grid to single column */
             .form-card > form > div[style*="grid-template-columns"] {
                 display: flex !important;
@@ -310,7 +278,7 @@
                     <td>${new Date(r.created_at).toLocaleDateString()}</td>
                     <td style="font-weight: 500;">${r.customer_name}</td>
                     <td style="color: var(--text-secondary);">${r.customer_email || 'N/A'}</td>
-                    <td style="color: var(--accent-color); font-weight: 600;">$${parseFloat(r.total_amount).toFixed(2)}</td>
+                    <td style="color: var(--accent-color); font-weight: 600;">#${parseFloat(r.total_amount).toFixed(2)}</td>
                     <td>
                         <div class="action-btns">
                             <button class="btn-download" data-id="${r.id}">Download</button>
