@@ -8,9 +8,17 @@ const tenantPools = new Map();
 
 const createPoolFromUrl = (connectionString) => {
     try {
+        // Parse connection string to check for Railway environment
+        const isRailway = process.env.RAILWAY_ENVIRONMENT === 'true' || 
+                         process.env.RAILWAY_PROJECT_NAME || 
+                         process.env.RAILWAY_SERVICE_NAME;
+        
+        // Railway PostgreSQL requires SSL
+        const ssl = isRailway ? { rejectUnauthorized: false } : false;
+        
         return new Pool({ 
             connectionString,
-            ssl: false,
+            ssl,
             max: 10,
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 10000

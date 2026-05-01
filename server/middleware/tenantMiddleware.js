@@ -57,15 +57,19 @@ export const tenantMiddleware = async (req, res, next) => {
         const masterPool = getMasterPool();
 
         const tenantResult = await masterPool.query(
-            'SELECT database_url FROM tenants WHERE id = $1 AND status = $2',
+            'SELECT id, slug, database_url FROM tenants WHERE id = $1 AND status = $2',
             [tenant_id, 'active']
         );
 
         if (tenantResult.rows.length === 0) {
+            console.error('[tenantMiddleware] Tenant not found:', { tenant_id, user_id });
             return res.status(404).json({ error: 'Tenant not found or inactive.' });
         }
 
-        const { database_url } = tenantResult.rows[0];
+        const tenant = tenantResult.rows[0];
+        const { database_url } = tenant;
+        
+        console.log('[tenantMiddleware] Connecting to tenant DB:', database_url.replace(/:[^:@]+@/, ':***@'));
 
         // ── Step 5: Get (or create) pooled connection to tenant DB ─────────
         const tenantDb = await getTenantPool(database_url);

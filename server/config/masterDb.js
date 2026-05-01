@@ -203,24 +203,13 @@ export const initializeMasterDatabase = async () => {
             console.warn("⚠️ refresh_tokens revoked column migration warning:", migrateErr.message);
         }
         
-        // Drop problematic foreign key constraint if it exists
+        // Drop any foreign key constraints on refresh_tokens.user_id
+        // refresh_tokens can hold IDs from either users or master_users, so no FK allowed
         try {
-            await masterPool.query(`
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1 FROM information_schema.table_constraints 
-                        WHERE constraint_name = 'refresh_tokens_user_id_fkey'
-                        AND table_name = 'refresh_tokens'
-                    ) THEN
-                        ALTER TABLE refresh_tokens DROP CONSTRAINT refresh_tokens_user_id_fkey;
-                        RAISE NOTICE 'Dropped foreign key constraint refresh_tokens_user_id_fkey';
-                    END IF;
-                END
-                $$;
-            `);
-        } catch (fkErr) {
-            console.log("ℹ️ Foreign key check/update:", fkErr.message);
+            await masterPool.query(`ALTER TABLE refresh_tokens DROP CONSTRAINT IF EXISTS fk_user`);
+            await masterPool.query(`ALTER TABLE refresh_tokens DROP CONSTRAINT IF EXISTS refresh_tokens_user_id_fkey`);
+        } catch (e) {
+            // ignore
         }
         
         // Migrate refresh_tokens table if user_type column is missing
