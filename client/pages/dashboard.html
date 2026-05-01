@@ -24,13 +24,30 @@
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             .nav {
-                flex-direction: column;
-                justify-content: center;
-                gap: 1rem;
-                text-align: center;
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;  
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0;
+                margin: 0 1rem;
+            }
+            .logo-container {
+                display: flex;
+                align-items: center;
+                gap: 0.3rem;
+
+                img{
+                    height: 55px;
+                    width: 55px;
+                    border-radius: 10%;
+                }
+                
             }
             .nav-links {
+                display: flex;
                 gap: 0.5rem;
+                align-items: center;
             }
             .nav-links a {
                 padding: 0.4rem 0.8rem;
@@ -109,11 +126,10 @@
                 font-size: 1.5rem;
             }
         }
-
-        /* Center the main content card */
-        .tab-content .form-card {
-            max-width: 900px;
-            margin: 2rem auto;
+        header{
+            width: 100%;
+            height: auto;
+            padding: .25rem;
         }
     </style>
 </head>
@@ -123,14 +139,14 @@
             <nav class="nav">
                 <div class="logo-container">
                     <img src="../assets/logo.jpg" alt="BQ Receipt Logo">
-                    <span style="font-size: 1.5rem; font-weight: 700;">BQ Receipt</span>
+                    <span style="font-size: 1rem; font-weight: 700;">BQ Receipt</span>
                 </div>
                 <div class="nav-links">
                     <a href="#" data-tab="create" class="active" onclick="switchTab(event, 'create')">Create</a>
                     <a href="#" data-tab="history" onclick="switchTab(event, 'history')">History</a>
                 </div>
                 <div class="nav-actions">
-                    <span id="userName" style="margin-right: 1rem; color: var(--text-secondary);"></span>
+                    <span id="userName" style="margin-right: 1rem; font-size.5rem; color: var(--text-secondary);"></span>
                     <a href="#" id="logoutBtn" style="color: var(--error);">Logout</a>
                 </div>
             </nav>
@@ -294,7 +310,7 @@
                     <td>${new Date(r.created_at).toLocaleDateString()}</td>
                     <td style="font-weight: 500;">${r.customer_name}</td>
                     <td style="color: var(--text-secondary);">${r.customer_email || 'N/A'}</td>
-                    <td style="color: var(--accent-color); font-weight: 600;">#${parseFloat(r.total_amount).toFixed(2)}</td>
+                    <td style="color: var(--accent-color); font-weight: 600;">$${parseFloat(r.total_amount).toFixed(2)}</td>
                     <td>
                         <div class="action-btns">
                             <button class="btn-download" data-id="${r.id}">Download</button>

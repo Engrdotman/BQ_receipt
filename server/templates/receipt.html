@@ -303,8 +303,8 @@
                     <td>{{description}}</td>
                     <td style="text-align: center;">{{imei}}</td>
                     <td style="text-align: center;">{{quantity}}</td>
-                    <td style="text-align: right;">₦{{price}}</td>
-                    <td style="text-align: right;">₦{{total}}</td>
+                    <td style="text-align: right;">${{price}}</td>
+                    <td style="text-align: right;">${{total}}</td>
                 </tr>
                 {{/each}}
             </tbody>
@@ -314,15 +314,15 @@
             <div class="total-box">
                 <div class="total-row">
                     <span>Subtotal</span>
-                    <span>₦{{subtotal}}</span>
+                    <span>${{subtotal}}</span>
                 </div>
                 <div class="total-row">
                     <span>Tax (0%)</span>
-                    <span>₦0.00</span>
+                    <span>$0.00</span>
                 </div>
                 <div class="total-row grand-total">
                     <span>Amount Due</span>
-                    <span>₦{{total_amount}}</span>
+                    <span>${{total_amount}}</span>
                 </div>
             </div>
         </div>

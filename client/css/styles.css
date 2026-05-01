@@ -71,6 +71,8 @@ header {
 .logo-container img {
     height: 70px;
     width: auto;
+    border-radius: 10%;
+    object-fit: cover;
 }
 
 .nav-links a {
