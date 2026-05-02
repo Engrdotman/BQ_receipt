@@ -216,8 +216,10 @@
     </div>
 
 <script type="module">
-        import { auth, receipts } from '../js/api.js';
+        import { auth, receipts, startInactivityTracking } from '../js/api.js';
         import { checkAuth, getUser, handleLogout } from '../js/auth.js';
+
+        startInactivityTracking();
 
         function switchTab(e, tab) {
             e.preventDefault();

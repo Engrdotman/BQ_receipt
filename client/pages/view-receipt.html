@@ -170,8 +170,10 @@
 
     <!-- Scripts -->
     <script type="module">
-        import { receipts, logout } from '../js/api.js';
+        import { receipts, logout, startInactivityTracking } from '../js/api.js';
         import { checkAuth, getUser, handleLogout } from '../js/auth.js';
+
+        startInactivityTracking();
 
         if (!checkAuth()) throw new Error('Not authenticated');
 

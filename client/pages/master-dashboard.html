@@ -341,7 +341,9 @@
     </div>
 
     <script type="module">
-        import { auth, master } from '../js/api.js';
+        import { auth, master, startInactivityTracking } from '../js/api.js';
+
+        startInactivityTracking();
 
         if (!auth.isAuthenticated()) {
             window.location.href = 'master-login.html';

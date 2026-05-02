@@ -1,6 +1,8 @@
 const ENV = {
     TIMEOUT: 30000,
     CLIENT_URL: import.meta.env?.VITE_CLIENT_URL || 'https://bq-receipt.vercel.app',
+    INACTIVITY_TIMEOUT: parseInt(import.meta.env?.VITE_INACTIVITY_TIMEOUT) || 15 * 60 * 1000,
+    WARNING_TIME: parseInt(import.meta.env?.VITE_WARNING_TIME) || 60 * 1000,
     // Predefined API endpoints for easy switching
     API_ENDPOINTS: [
         { name: 'Production', url: 'https://bqreceipt-production.up.railway.app/api' },
@@ -99,6 +101,46 @@ const getUser = () => {
 const setUser = (user) => localStorage.setItem('bq_user', JSON.stringify(user));
 const removeUser = () => localStorage.removeItem('bq_user');
 
+let inactivityTimer = null;
+let warningTimer = null;
+let isWarningShown = false;
+
+const resetInactivityTimer = () => {
+    if (!getToken()) return;
+    
+    clearTimeout(inactivityTimer);
+    clearTimeout(warningTimer);
+    isWarningShown = false;
+    
+    warningTimer = setTimeout(() => {
+        isWarningShown = true;
+        const extend = confirm('You will be logged out in 1 minute due to inactivity. Click OK to stay logged in.');
+        if (extend) {
+            resetInactivityTimer();
+        }
+    }, ENV.INACTIVITY_TIMEOUT - ENV.WARNING_TIME);
+    
+    inactivityTimer = setTimeout(() => {
+        auth.logout();
+    }, ENV.INACTIVITY_TIMEOUT);
+};
+
+const initInactivityTracking = () => {
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+        document.addEventListener(event, resetInactivityTimer, { passive: true });
+    });
+    
+    resetInactivityTimer();
+};
+
+const startInactivityTracking = () => {
+    if (getToken()) {
+        initInactivityTracking();
+    }
+};
+
 async function request(endpoint, options = {}) {
     const url = `${getApiUrl()}${endpoint}`;
     const token = getToken();
@@ -195,6 +237,8 @@ export const auth = {
     },
 
     logout: () => {
+        clearTimeout(inactivityTimer);
+        clearTimeout(warningTimer);
         removeToken();
         removeRefreshToken();
         removeUser();
@@ -227,7 +271,7 @@ export const master = {
     }
 };
 
-export { getApiUrl, getAvailableEndpoints, switchApiEndpoint };
+export { getApiUrl, getAvailableEndpoints, switchApiEndpoint, startInactivityTracking };
 
 export const receipts = {
     getAll: () => request('/receipts'),
