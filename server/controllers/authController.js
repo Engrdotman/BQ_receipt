@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { generateToken, verifyToken, generateRefreshToken } from '../utils/generateToken.js';
 import { getMasterPool } from '../config/masterDb.js';
+import { sendPasswordResetEmail } from '../utils/emailService.js';
 
 // ─────────────────────────────────────────────
 //  REFRESH TOKEN
@@ -216,7 +217,7 @@ export const forgotPassword = async (req, res) => {
             tenantId = tenantResult.rows[0].id;  // Use integer id, not VARCHAR tenant_id
         }
 
-        let query = 'SELECT id FROM users WHERE username = $1';
+        let query = 'SELECT id, email FROM users WHERE username = $1';
         const params = [username];
 
         if (tenantId) {
@@ -242,9 +243,20 @@ export const forgotPassword = async (req, res) => {
             [user.id, resetToken]
         );
 
-        const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${resetToken}`;
+        const resetUrl = `${process.env.CLIENT_URL || (req.protocol + '://' + req.get('host'))}/reset-password.html?token=${resetToken}`;
 
-        return res.json({ message: 'Password reset instructions have been sent to your registered email.', resetUrl });
+        if (user.email) {
+            try {
+                await sendPasswordResetEmail(user.email, username, resetUrl);
+            } catch (emailError) {
+                console.error('[forgotPassword] Email error:', emailError.message);
+                // We still return success to the client but log the error
+            }
+        } else {
+            console.warn(`[forgotPassword] No email found for user: ${username}`);
+        }
+
+        return res.json({ message: 'If the username exists, reset instructions have been sent to your registered email.' });
     } catch (error) {
         console.error('[forgotPassword] Error:', error.message);
         return res.status(500).json({ error: 'Failed to process request' });

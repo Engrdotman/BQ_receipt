@@ -41,6 +41,7 @@ export const initializeMasterDatabase = async () => {
             CREATE TABLE IF NOT EXISTS master_users (
                 id SERIAL PRIMARY KEY,
                 username VARCHAR(50) UNIQUE NOT NULL,
+                email VARCHAR(255),
                 password TEXT NOT NULL,
                 role VARCHAR(20) DEFAULT 'super_admin',
                 tenant_id VARCHAR(50),
@@ -54,6 +55,7 @@ export const initializeMasterDatabase = async () => {
                 id SERIAL PRIMARY KEY,
                 tenant_id INTEGER NOT NULL,
                 username VARCHAR(50) NOT NULL,
+                email VARCHAR(255),
                 password TEXT NOT NULL,
                 role VARCHAR(20) DEFAULT 'admin',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -129,6 +131,37 @@ export const initializeMasterDatabase = async () => {
             }
             
             console.log("✅ Tenants table migration complete");
+
+
+
+
+        // Migrate master_users to add email if missing
+        try {
+            const masterEmailCheck = await masterPool.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'master_users' AND column_name = 'email'
+            `);
+            if (masterEmailCheck.rows.length === 0) {
+                console.log("⚠️ Adding email column to master_users table...");
+                await masterPool.query(`ALTER TABLE master_users ADD COLUMN email VARCHAR(255)`);
+            }
+        } catch (e) {
+            console.warn("⚠️ master_users email migration warning:", e.message);
+        }
+
+        // Migrate users to add email if missing
+        try {
+            const userEmailCheck = await masterPool.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'email'
+            `);
+            if (userEmailCheck.rows.length === 0) {
+                console.log("⚠️ Adding email column to users table...");
+                await masterPool.query(`ALTER TABLE users ADD COLUMN email VARCHAR(255)`);
+            }
+        } catch (e) {
+            console.warn("⚠️ users email migration warning:", e.message);
+        }
         } catch (migrateErr) {
             console.warn("⚠️ Migration warning:", migrateErr.message);
         }

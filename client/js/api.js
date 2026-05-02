@@ -2,7 +2,6 @@ const ENV = {
     TIMEOUT: 30000,
     CLIENT_URL: import.meta.env?.VITE_CLIENT_URL || 'https://bq-receipt.vercel.app',
     INACTIVITY_TIMEOUT: parseInt(import.meta.env?.VITE_INACTIVITY_TIMEOUT) || 15 * 60 * 1000,
-    WARNING_TIME: parseInt(import.meta.env?.VITE_WARNING_TIME) || 60 * 1000,
     // Predefined API endpoints for easy switching
     API_ENDPOINTS: [
         { name: 'Production', url: 'https://bqreceipt-production.up.railway.app/api' },
@@ -102,23 +101,11 @@ const setUser = (user) => localStorage.setItem('bq_user', JSON.stringify(user));
 const removeUser = () => localStorage.removeItem('bq_user');
 
 let inactivityTimer = null;
-let warningTimer = null;
-let isWarningShown = false;
 
 const resetInactivityTimer = () => {
     if (!getToken()) return;
     
     clearTimeout(inactivityTimer);
-    clearTimeout(warningTimer);
-    isWarningShown = false;
-    
-    warningTimer = setTimeout(() => {
-        isWarningShown = true;
-        const extend = confirm('You will be logged out in 1 minute due to inactivity. Click OK to stay logged in.');
-        if (extend) {
-            resetInactivityTimer();
-        }
-    }, ENV.INACTIVITY_TIMEOUT - ENV.WARNING_TIME);
     
     inactivityTimer = setTimeout(() => {
         auth.logout();
@@ -238,7 +225,6 @@ export const auth = {
 
     logout: () => {
         clearTimeout(inactivityTimer);
-        clearTimeout(warningTimer);
         removeToken();
         removeRefreshToken();
         removeUser();
